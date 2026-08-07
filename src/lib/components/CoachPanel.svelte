@@ -13,15 +13,9 @@
 		[...game.moves].reverse().find((m) => m.color === game.playerColor) ?? null
 	);
 
-	const hintButtonLabel = $derived(
-		game.hintLevel === 0
-			? 'Get a hint'
-			: game.hintLevel === 1
-				? 'I need more'
-				: game.hintLevel === 2
-					? 'Just tell me the move'
-					: 'Move revealed'
-	);
+	// The first hint arrives on its own at the start of every turn, so the panel
+	// only ever offers the two escalations past it.
+	const canEscalate = $derived(game.isPlayerTurn && !game.hintLoading);
 </script>
 
 {#snippet card(res: CoachResponse, tone: 'hint' | 'feedback')}
@@ -59,7 +53,7 @@
 
 	{#if game.status === 'booting'}
 		<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-400">
-			Starting the engines…
+			Warming up the engine…
 		</div>
 	{/if}
 
@@ -90,23 +84,47 @@
 		</div>
 	{/if}
 
-	<!-- Hint -->
+	<!-- Hint. Level 1 is automatic; the buttons only escalate. -->
 	{#if game.status !== 'game-over'}
 		<section class="space-y-3">
-			<button
-				onclick={() => game.requestHint()}
-				disabled={!game.isPlayerTurn || game.hintLoading || game.hintLevel >= 3}
-				class="w-full rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-			>
-				{game.hintLoading ? 'Thinking…' : hintButtonLabel}
-				{#if game.hintLevel > 0 && game.hintLevel < 3}
-					<span class="ml-1 text-xs text-sky-400/70">({game.hintLevel}/3)</span>
+			<div class="flex items-baseline justify-between">
+				<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">This position</h3>
+				{#if game.hintLevel > 0}
+					<span class="text-xs text-sky-400/70">Hint {game.hintLevel}/3</span>
 				{/if}
-			</button>
+			</div>
 
-			{#if game.hint}
+			{#if game.hintLoading}
+				<div class="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+					<div class="flex items-center gap-2 text-sm text-sky-200/70">
+						<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
+						Looking at the position…
+					</div>
+				</div>
+			{:else if game.hint}
 				{@render card(game.hint, 'hint')}
+			{:else}
+				<div class="rounded-lg border border-dashed border-slate-800 p-4 text-sm text-slate-500">
+					A hint appears here as soon as it's your move.
+				</div>
 			{/if}
+
+			<div class="grid grid-cols-2 gap-2">
+				<button
+					onclick={() => game.requestHint(2)}
+					disabled={!canEscalate || game.hintLevel >= 2}
+					class="rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					I need more
+				</button>
+				<button
+					onclick={() => game.requestHint(3)}
+					disabled={!canEscalate || game.hintLevel >= 3}
+					class="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					Show me the move
+				</button>
+			</div>
 		</section>
 	{/if}
 
