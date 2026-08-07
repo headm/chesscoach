@@ -20,7 +20,6 @@
 	});
 	onDestroy(() => game.destroy());
 
-	const highlight = $derived(game.hint?.highlightSquares ?? game.coach?.highlightSquares ?? []);
 	const cgColor = (c: Color) => (c === 'w' ? 'white' : 'black');
 </script>
 
@@ -34,7 +33,7 @@
 					: game.status === 'player-turn'
 						? 'Your move'
 						: game.status === 'booting'
-							? 'Loading engines…'
+							? 'Warming up the engine…'
 							: game.status === 'game-over'
 								? 'Game over'
 								: 'Reviewing…'}
@@ -55,7 +54,6 @@
 					dests={game.dests}
 					lastMove={game.lastMove}
 					check={game.inCheck}
-					{highlight}
 					onMove={(from, to) => game.playerMove(from as never, to as never)}
 				/>
 			</div>

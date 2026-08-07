@@ -1,15 +1,15 @@
 /**
- * Attribution for the bundled chess engine.
+ * Attribution for the chess engine behind the analysis.
  *
- * Stockfish.js is GPLv3, and this app serves the compiled engine to every
- * visitor's browser — which is distribution, not mere use. That obliges us to
- * ship the licence text and tell recipients where to get the corresponding
- * source. These constants back the visible attribution in the UI; the licence
- * text itself is copied to /stockfish/COPYING.txt by scripts/setup-stockfish.mjs.
+ * Stockfish.js is GPLv3. Now that the engine runs on our own server rather than
+ * in the visitor's browser, we are no longer conveying it and the licence's
+ * distribution obligations do not bite. The attribution stays anyway: players
+ * are entitled to know what is grading their moves, and pointing at the licence
+ * and the corresponding source costs two links.
  *
  * `scripts/setup-stockfish.mjs` checks ENGINE.npmVersion against the installed
  * package and fails loudly if they drift, so the version quoted to users can't
- * silently go stale.
+ * silently go stale. It also writes the licence text these links resolve to.
  */
 
 export const ENGINE = {

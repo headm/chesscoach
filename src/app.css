@@ -7,15 +7,8 @@
    size directly (aspect-square + w-full). Forcing height:100% against a parent
    with no definite height silently collapses it to zero. */
 
-/* Coach highlight — distinct from chessground's own last-move/selected tints.
-   Note: do not set background/background-image on `cg-board` — the brown theme
-   paints the checkerboard there as an embedded SVG, and overriding it leaves a
-   flat single-colour board. */
-.cg-wrap square.coach-highlight {
-	background: radial-gradient(
-		circle,
-		rgba(56, 189, 248, 0.55) 22%,
-		rgba(56, 189, 248, 0.18) 40%,
-		transparent 60%
-	);
-}
+/* The coach used to paint blue radial highlights on the squares it mentioned.
+   They sat on top of chessground's own last-move, check and move-destination
+   tints and were hard to tell apart from them, so the board now shows only
+   chessground's tints. `highlightSquares` still comes back in the coach
+   response — nothing renders it. */

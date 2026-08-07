@@ -1,18 +1,18 @@
 /**
- * Game orchestration: two engine instances, the move loop, and the coach calls.
+ * Game orchestration: the move loop, the analysis calls, and the coach calls.
  *
- * Two Stockfish workers run side by side — an analyst at full strength whose
- * output feeds the coach, and an opponent throttled to the player's ELO. The
- * coaching has to be correct even when the opponent is playing at 800, so they
- * cannot be the same instance.
+ * Nothing here computes chess. Stockfish runs on the server behind
+ * /api/engine — this class asks it to evaluate a position or to produce an
+ * opponent move at the player's rating, and owns everything around those two
+ * answers: grading, the move list, and when to talk to the coach.
  */
 
 import { Chess, type Color, type Square } from 'chess.js';
 
 import { extractFacts, filterFactsForBand, pvToSan } from '$lib/chess/facts';
 import { openingName } from '$lib/chess/openings';
-import { Engine, fromWhiteCp, toWhiteCp, type EngineLine } from '$lib/engine/uci';
-import { ANALYST_DEPTH, ANALYST_OPTIONS, opponentConfig, pickOpponentMove } from '$lib/engine/strength';
+import { analyse, opponentMove } from '$lib/engine/client';
+import { fromWhiteCp, toWhiteCp, type EngineLine } from '$lib/engine/uci';
 import { bandFor, gradeMove, type MoveGrade } from '$lib/coach/levels';
 import type { CandidateLine, CoachRequest, CoachResponse, PlayedMoveInfo } from '$lib/coach/types';
 
@@ -50,10 +50,10 @@ export class Game {
 	hint = $state<CoachResponse | null>(null);
 	hintLoading = $state(false);
 
-	private analyst: Engine | null = null;
-	private opponent: Engine | null = null;
 	/** Analysis of the current position with the player to move. */
 	private currentAnalysis: EngineLine[] = [];
+	/** Set once the component owning this game is gone, so late replies are dropped. */
+	private disposed = false;
 
 	get band() {
 		return bandFor(this.elo);
@@ -93,45 +93,49 @@ export class Game {
 		this.coach = null;
 		this.hint = null;
 		this.hintLevel = 0;
+		this.hintLoading = false;
 		this.resultText = null;
 		this.status = 'booting';
 
-		this.analyst?.destroy();
-		this.opponent?.destroy();
-
-		this.analyst = new Engine();
-		this.opponent = new Engine();
-
-		const cfg = opponentConfig(elo);
-		await Promise.all([
-			this.analyst.setOptions({ ...ANALYST_OPTIONS, MultiPV: 3 }),
-			this.opponent.setOptions(cfg.options)
-		]);
-
 		if (color === 'b') {
 			this.status = 'thinking';
-			await this.engineMove();
+			if (!(await this.engineMove())) return;
 		}
 		await this.refreshAnalysis();
-		if (!this.checkGameOver()) this.status = 'player-turn';
+		if (!this.checkGameOver() && !this.disposed) this.beginPlayerTurn();
 	}
 
 	destroy() {
-		this.analyst?.destroy();
-		this.opponent?.destroy();
-		this.analyst = null;
-		this.opponent = null;
+		this.disposed = true;
 	}
 
 	/** Re-analyse the current position from the player's side and cache the result. */
 	private async refreshAnalysis() {
-		if (!this.analyst || this.chess.isGameOver()) return;
-		this.currentAnalysis = await this.analyst.analyse(this.chess.fen(), {
-			multipv: 3,
-			depth: ANALYST_DEPTH
-		});
+		if (this.chess.isGameOver()) return;
+		const fen = this.chess.fen();
+		let lines: EngineLine[];
+		try {
+			lines = await analyse(fen);
+		} catch {
+			// A dropped analysis costs this move's grade and hint, not the game.
+			return;
+		}
+		// The board may have moved on while the request was in flight.
+		if (this.disposed || this.chess.fen() !== fen) return;
+		this.currentAnalysis = lines;
 		const top = this.currentAnalysis[0];
 		if (top) this.evalWhiteCp = toWhiteCp(top, this.chess.turn());
+	}
+
+	/**
+	 * Hand control back to the player and open with a hint.
+	 *
+	 * The first hint is not something the player has to ask for — it is the
+	 * point of the app. The buttons in the panel only exist to escalate past it.
+	 */
+	private beginPlayerTurn() {
+		this.status = 'player-turn';
+		this.requestHint(1);
 	}
 
 	/** Best evaluation of the current position, from the player's point of view. */
@@ -160,6 +164,9 @@ export class Game {
 		this.lastMove = [from, to];
 		this.hint = null;
 		this.hintLevel = 0;
+		// Any hint still in flight is for the position the player just left; its
+		// reply will be discarded, so clear the spinner here rather than waiting.
+		this.hintLoading = false;
 		this.status = 'coaching';
 		this.coachLoading = true;
 
@@ -212,6 +219,7 @@ export class Game {
 				playedMove: played
 			},
 			(res) => {
+				if (this.disposed) return;
 				this.coach = res;
 				this.coachLoading = false;
 			}
@@ -220,28 +228,28 @@ export class Game {
 		if (this.checkGameOver()) return true;
 
 		this.status = 'thinking';
-		await this.engineMove();
+		if (!(await this.engineMove())) return true;
 		if (this.checkGameOver()) return true;
 
 		await this.refreshAnalysis();
-		this.status = 'player-turn';
+		if (!this.disposed) this.beginPlayerTurn();
 		return true;
 	}
 
-	private async engineMove() {
-		if (!this.opponent || this.chess.isGameOver()) return;
-		const cfg = opponentConfig(this.elo);
+	/** Play the opponent's reply. Returns false when the game can't continue. */
+	private async engineMove(): Promise<boolean> {
+		if (this.chess.isGameOver()) return true;
 
-		let uci: string;
-		if (cfg.multipv > 1) {
-			const lines = await this.opponent.analyse(this.chess.fen(), {
-				multipv: cfg.multipv,
-				movetime: cfg.movetime
-			});
-			uci = pickOpponentMove(lines, cfg);
-		} else {
-			uci = await this.opponent.bestMove(this.chess.fen(), cfg.movetime);
+		let uci: string | null;
+		try {
+			uci = await opponentMove(this.chess.fen(), this.elo);
+		} catch {
+			this.status = 'game-over';
+			this.resultText = 'The engine stopped responding — start a new game to continue.';
+			return false;
 		}
+		if (this.disposed) return false;
+		if (!uci) return true;
 
 		const from = uci.slice(0, 2) as Square;
 		const to = uci.slice(2, 4) as Square;
@@ -250,7 +258,7 @@ export class Game {
 			to,
 			promotion: uci.length > 4 ? uci[4] : undefined
 		});
-		if (!move) return;
+		if (!move) return true;
 
 		this.fen = this.chess.fen();
 		this.lastMove = [from, to];
@@ -265,11 +273,20 @@ export class Game {
 				evalAfterWhiteCp: this.evalWhiteCp
 			}
 		];
+		return true;
 	}
 
-	async requestHint() {
-		if (!this.isPlayerTurn || this.hintLoading) return;
-		const next = Math.min(3, this.hintLevel + 1) as 1 | 2 | 3;
+	/**
+	 * Fetch the hint for `level`, or the next one up if no level is given.
+	 *
+	 * Level 1 is fired automatically at the start of every player turn; 2 and 3
+	 * are the "I need more" and "show me the move" buttons. Asking for a level
+	 * at or below the one already on screen is a no-op — the panel would flicker
+	 * back to a vaguer hint.
+	 */
+	requestHint(level?: 1 | 2 | 3) {
+		const next = level ?? (Math.min(3, this.hintLevel + 1) as 1 | 2 | 3);
+		if (!this.isPlayerTurn || this.hintLoading || next <= this.hintLevel) return;
 		this.hintLevel = next;
 		this.hintLoading = true;
 
@@ -287,6 +304,10 @@ export class Game {
 				hintLevel: next
 			},
 			(res) => {
+				// Hints are now fired automatically, so one is almost always in flight
+				// when the player moves. Dropping replies whose position has gone
+				// keeps a stale hint off the board.
+				if (this.disposed || this.chess.fen() !== fen) return;
 				this.hint = res;
 				this.hintLoading = false;
 			}

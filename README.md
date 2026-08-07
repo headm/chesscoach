@@ -7,12 +7,12 @@ setting chosen before each game.
 ## Running it
 
 ```bash
-npm install            # postinstall copies Stockfish into static/
+npm install            # postinstall checks the Stockfish build + writes attribution
 cp .env.example .env   # add your ANTHROPIC_API_KEY
 npm run dev
 ```
 
-If you ever need to re-copy the engine by hand: `npm run setup:stockfish`.
+To re-run that check by hand: `npm run setup:stockfish`.
 
 The app runs without an API key — it falls back to heuristic, template-based
 coaching. That fallback is a real degradation, not a placeholder: it is the
@@ -22,16 +22,25 @@ the argument for the model-backed coach.
 ## How it fits together
 
 ```
- browser                                            server
-┌──────────────────────────────────┐              ┌────────────────────────┐
-│  stockfish.wasm × 2              │              │  /api/coach            │
-│    analyst  (full strength)  ────┼── facts ────▶│    Claude              │
-│    opponent (throttled to ELO)   │   + lines    │    (prose only)        │
-│                                  │◀── note ─────┤                        │
-│  chess.js  → legality, SAN, FEN  │              └────────────────────────┘
-│  chessground → board UI          │
-└──────────────────────────────────┘
+ browser                                    server
+┌────────────────────────────┐   fen     ┌──────────────────────────────────┐
+│  chess.js → legality, SAN  │──────────▶│  /api/engine                     │
+│  chessground → board UI    │◀──────────│    stockfish.wasm (one instance) │
+│                            │  lines /  │    full strength for analysis,   │
+│                            │  best move│    throttled for the opponent    │
+│                            │           ├──────────────────────────────────┤
+│                            │── facts ─▶│  /api/coach                      │
+│                            │  + lines  │    Claude (prose only)           │
+│                            │◀── note ──│                                  │
+└────────────────────────────┘           └──────────────────────────────────┘
 ```
+
+The browser holds no engine. It sends a FEN and gets back either candidate lines
+(for evaluation, grading and the coach) or one opponent move at the player's
+rating — depth, MultiPV and skill level are server-side constants, so a client
+can't ask a shared process for `go depth 40`. One WASM instance serves both
+roles; every call states its full UCI option set rather than relying on what ran
+before it.
 
 **Claude never evaluates the position.** Stockfish does. The endpoint receives
 engine candidate lines plus a set of deterministic observations extracted from
@@ -89,40 +98,41 @@ has started varying inside the prefix.
   can't step back through them.
 - **No persistence.** Games are not saved; there is no account system.
 - **Desktop layout only.** It reflows on mobile but hasn't been tuned there.
-- **Hint prefetching isn't implemented** — the first hint on each move pays full
-  latency. The analysis it needs is already cached, so this is a UI change.
+- **Hints aren't prefetched.** The level-1 hint fires as soon as the turn opens,
+  but it starts from scratch — nothing is computed during the opponent's move.
+- **One engine, one queue.** A single WASM instance is shared by every visitor
+  hitting the same server process, and requests are serialised. Fine at this
+  scale; a busy deployment wants a pool.
 
 ## Licensing
 
-Stockfish.js is **GPLv3**, and this app serves the compiled engine to every
-visitor's browser. That is *conveying* it, not merely using it — the same code
-running server-side would carry no obligation at all (GPLv3 has no network
-clause; that's AGPL). So the obligations are live the moment you deploy.
+Stockfish.js is **GPLv3**. It now runs on our server and only its output — an
+evaluation, a move — reaches the browser. That is using the program, not
+conveying it, and GPLv3 has no network clause (that's AGPL), so the distribution
+obligations do not apply. The previous version shipped the compiled engine to
+every visitor and did have to satisfy them.
 
-**What's handled.** `scripts/setup-stockfish.mjs` copies `COPYING.txt` (the full
-licence) and generates `SOURCE.txt` (version, build, corresponding-source URLs)
-alongside the binary, and both are linked from a visible credit in the UI. The
-script refuses to run if the version quoted in
-`src/lib/engine/attribution.ts` drifts from the installed package, so the
-attribution can't silently go stale.
+The attribution stayed anyway. `scripts/setup-stockfish.mjs` writes `COPYING.txt`
+(the full licence) and `SOURCE.txt` (version, build, corresponding-source URLs)
+to `static/stockfish/`, both linked from a visible credit in the UI, and refuses
+to run if the version quoted in `src/lib/engine/attribution.ts` drifts from the
+installed package. Players should be able to see what is grading their moves.
 
-**What's not settled.** Whether the GPL reaches *your* application code. The
-argument that it doesn't is structural: Stockfish runs in a Web Worker with its
-own global scope and no shared memory, and all communication is text over UCI, a
-documented engine-agnostic protocol — closer to two programs over a pipe than to
-linking. Nothing of Stockfish enters your bundle, and any UCI engine could
-replace it without touching `uci.ts`. That argument is strong but it is an
-argument, not a ruling.
-
-If you want the question gone rather than argued, move the engine server-side
-(the Option C architecture): the user receives move recommendations instead of a
-program, and nothing is conveyed. The cost is that you pay for the compute.
+Moving the engine also retires the question of whether the GPL reaches your
+application code: nothing of Stockfish enters the client bundle, and the server
+talks to it over UCI — text in, text out, closer to two programs over a pipe
+than to linking. The cost is that you now pay for the compute.
 
 Not legal advice — get a real opinion before shipping this commercially.
 
 ## Cost
 
-One Claude call per player move (feedback) plus one per hint press. With the
-default `claude-opus-5` at `effort: "low"` and the system prompt cached, a
-40-move game lands in the low tens of cents. `COACH_MODEL=claude-sonnet-5` or
-`claude-haiku-4-5` trades some coaching quality for latency and cost.
+Two Claude calls per player move: feedback on the move played, and the hint that
+opens the next turn. The "I need more" and "show me the move" buttons add one
+each when used. With the default `claude-opus-5` at `effort: "low"` and the
+system prompt cached, a 40-move game lands in the low tens of cents.
+`COACH_MODEL=claude-sonnet-5` or `claude-haiku-4-5` trades some coaching quality
+for latency and cost.
+
+Engine compute is now yours too: roughly 50–450ms of a serverless CPU per
+analysis, twice per move, plus the opponent's own think time.

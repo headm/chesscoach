@@ -13,28 +13,14 @@
 		dests: Map<string, string[]>;
 		lastMove: [string, string] | null;
 		check: boolean;
-		highlight: string[];
 		onMove: (from: string, to: string) => void;
 	}
 
-	let {
-		fen,
-		orientation,
-		turnColor,
-		movableColor,
-		dests,
-		lastMove,
-		check,
-		highlight,
-		onMove
-	}: Props = $props();
+	let { fen, orientation, turnColor, movableColor, dests, lastMove, check, onMove }: Props =
+		$props();
 
 	let api: Api | null = null;
 	let resizeObserver: ResizeObserver | null = null;
-
-	const customHighlights = $derived(
-		new Map<Key, string>(highlight.map((sq) => [sq as Key, 'coach-highlight']))
-	);
 
 	function board(node: HTMLDivElement) {
 		api = Chessground(node, {
@@ -51,7 +37,7 @@
 				events: { after: (from: Key, to: Key) => onMove(from, to) }
 			},
 			animation: { enabled: true, duration: 180 },
-			highlight: { lastMove: true, check: true, custom: customHighlights },
+			highlight: { lastMove: true, check: true },
 			drawable: { enabled: false }
 		});
 
@@ -88,7 +74,7 @@
 				color: movableColor,
 				dests: dests as Map<Key, Key[]>
 			},
-			highlight: { lastMove: true, check: true, custom: customHighlights }
+			highlight: { lastMove: true, check: true }
 		});
 	});
 

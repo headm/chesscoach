@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { ENGINE } from '$lib/engine/attribution';
 
-	// Visible attribution for the bundled GPLv3 engine. The app serves Stockfish
-	// to the browser, which is distribution — recipients are entitled to the
-	// licence and a pointer to the corresponding source, and a link they can
-	// actually see is the practical way to give them both.
+	// Visible attribution for the GPLv3 engine doing the analysis. It runs on the
+	// server, so this is courtesy rather than obligation — but a player should be
+	// able to see what is grading their moves, and check its licence.
 </script>
 
 <p class="text-[11px] leading-relaxed text-slate-500">
@@ -34,5 +33,5 @@
 		class="underline decoration-slate-700 underline-offset-2 hover:text-slate-300"
 	>
 		{ENGINE.license}
-	</a>. Source linked as required by the licence.
+	</a>. Runs on our server; source linked for reference.
 </p>
