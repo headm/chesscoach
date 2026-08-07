@@ -76,7 +76,7 @@ type Listener = (line: string) => void;
  * coaches). `scripts/setup-stockfish.mjs` asserts both files exist at install
  * time so a bad install fails there rather than here.
  */
-function loadEngine(onLine: (line: string) => void): Promise<StockfishModule> {
+async function loadEngine(onLine: (line: string) => void): Promise<StockfishModule> {
 	const enginePath = require.resolve('stockfish/bin/stockfish-18-lite-single.js');
 	const initEngine = require('stockfish/bin/stockfish-18-lite-single.js') as () => (
 		mod: StockfishModule
@@ -90,12 +90,35 @@ function loadEngine(onLine: (line: string) => void): Promise<StockfishModule> {
 		ccall: () => undefined // replaced by the runtime during init
 	};
 
-	return initEngine()(mod).then(async () => {
-		while (mod._isReady && !mod._isReady()) {
-			await new Promise((r) => setTimeout(r, 10));
-		}
-		return mod;
-	});
+	/*
+	 * The engine assigns `globalThis.fetch = null` on boot.
+	 *
+	 * That is deliberate on its side: under Node it wants the `fs.readFile` path
+	 * for locating the wasm, and nulling fetch is how it forces the branch. In a
+	 * browser Worker it only ever damaged its own global scope. Here it shares a
+	 * process with the coach endpoint, and a null `globalThis.fetch` is what the
+	 * Anthropic SDK resolves as its default — every call then dies inside the
+	 * SDK with `TypeError: Cannot read properties of null (reading 'call')`,
+	 * surfacing as an APIConnectionError and silently demoting the coach to
+	 * heuristics.
+	 *
+	 * Restore it synchronously. The assignment happens in the factory's opening
+	 * statements, so putting the repair in the same synchronous block as the
+	 * call means no other code can ever observe the null.
+	 */
+	const realFetch = globalThis.fetch;
+	let booted: Promise<unknown>;
+	try {
+		booted = initEngine()(mod);
+	} finally {
+		globalThis.fetch = realFetch;
+	}
+	await booted;
+
+	while (mod._isReady && !mod._isReady()) {
+		await new Promise((r) => setTimeout(r, 10));
+	}
+	return mod;
 }
 
 /**
