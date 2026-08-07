@@ -92,13 +92,33 @@ has started varying inside the prefix.
 - **Hint prefetching isn't implemented** — the first hint on each move pays full
   latency. The analysis it needs is already cached, so this is a UI change.
 
-## Licensing note
+## Licensing
 
-Stockfish.js is **GPLv3**. It is copied into `static/` at install time and
-served to the browser, so distributing this app distributes Stockfish. That has
-licensing implications for anything closed-source — worth resolving before this
-ships anywhere public. `static/stockfish/` is gitignored, so the binary isn't in
-your repo; the obligation attaches to what you deploy.
+Stockfish.js is **GPLv3**, and this app serves the compiled engine to every
+visitor's browser. That is *conveying* it, not merely using it — the same code
+running server-side would carry no obligation at all (GPLv3 has no network
+clause; that's AGPL). So the obligations are live the moment you deploy.
+
+**What's handled.** `scripts/setup-stockfish.mjs` copies `COPYING.txt` (the full
+licence) and generates `SOURCE.txt` (version, build, corresponding-source URLs)
+alongside the binary, and both are linked from a visible credit in the UI. The
+script refuses to run if the version quoted in
+`src/lib/engine/attribution.ts` drifts from the installed package, so the
+attribution can't silently go stale.
+
+**What's not settled.** Whether the GPL reaches *your* application code. The
+argument that it doesn't is structural: Stockfish runs in a Web Worker with its
+own global scope and no shared memory, and all communication is text over UCI, a
+documented engine-agnostic protocol — closer to two programs over a pipe than to
+linking. Nothing of Stockfish enters your bundle, and any UCI engine could
+replace it without touching `uci.ts`. That argument is strong but it is an
+argument, not a ruling.
+
+If you want the question gone rather than argued, move the engine server-side
+(the Option C architecture): the user receives move recommendations instead of a
+program, and nothing is conveyed. The cost is that you pay for the compute.
+
+Not legal advice — get a real opinion before shipping this commercially.
 
 ## Cost
 

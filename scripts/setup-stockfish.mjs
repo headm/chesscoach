@@ -15,15 +15,33 @@
  * Run: node scripts/setup-stockfish.mjs
  */
 
-import { cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
-const SRC = path.resolve('node_modules/stockfish/bin');
+const PKG = path.resolve('node_modules/stockfish');
+const SRC = path.join(PKG, 'bin');
 const DEST = path.resolve('static/stockfish');
+const ATTRIBUTION = path.resolve('src/lib/engine/attribution.ts');
 
 if (!existsSync(SRC)) {
 	console.error(`Could not find ${SRC}. Run npm install first.`);
+	process.exit(1);
+}
+
+/*
+ * Guard against the quoted version drifting from the installed one. The UI
+ * tells users which engine build they received and where to get its source;
+ * if that claim goes stale it stops being useful attribution.
+ */
+const installedVersion = JSON.parse(await readFile(path.join(PKG, 'package.json'), 'utf8')).version;
+const recordedVersion = (await readFile(ATTRIBUTION, 'utf8')).match(/npmVersion: '([^']+)'/)?.[1];
+if (recordedVersion && recordedVersion !== installedVersion) {
+	console.error(
+		`Version drift: stockfish ${installedVersion} is installed but ` +
+			`src/lib/engine/attribution.ts still says ${recordedVersion}.\n` +
+			`Update ENGINE.npmVersion (and engineVersion if the generation changed).`
+	);
 	process.exit(1);
 }
 
@@ -57,4 +75,40 @@ await mkdir(DEST, { recursive: true });
 await cp(path.join(SRC, chosen), path.join(DEST, 'stockfish.js'));
 await cp(path.join(SRC, wasm), path.join(DEST, 'stockfish.wasm'));
 
+/*
+ * GPLv3 compliance. Serving the compiled engine to a browser is conveying it,
+ * so the licence text has to travel with the binary and recipients need to be
+ * told where the corresponding source is. Copying only the .js/.wasm — as this
+ * script originally did — ships the engine without its licence.
+ */
+const licenseFile = ['Copying.txt', 'COPYING', 'LICENSE'].find((f) =>
+	existsSync(path.join(PKG, f))
+);
+if (!licenseFile) {
+	console.error(`No licence file found in ${PKG}. Refusing to ship the engine without it.`);
+	process.exit(1);
+}
+await cp(path.join(PKG, licenseFile), path.join(DEST, 'COPYING.txt'));
+
+await writeFile(
+	path.join(DEST, 'SOURCE.txt'),
+	[
+		'Stockfish.js — a WebAssembly build of the Stockfish chess engine.',
+		'',
+		`Version:  stockfish npm ${installedVersion} (Stockfish 18)`,
+		`Build:    ${chosen}`,
+		'License:  GNU General Public License v3 or later (see COPYING.txt)',
+		'',
+		'Corresponding source for this build:',
+		'  https://github.com/nmrugg/stockfish.js',
+		'Upstream Stockfish:',
+		'  https://github.com/official-stockfish/Stockfish',
+		'',
+		'Stockfish.js (c) Chess.com, LLC.',
+		'Stockfish (c) T. Romstad, M. Costalba, J. Kiiski, G. Linscott and contributors.',
+		''
+	].join('\n')
+);
+
 console.log(`Stockfish ready: ${chosen} -> static/stockfish/stockfish.js (+ .wasm)`);
+console.log(`GPLv3: COPYING.txt and SOURCE.txt written alongside the engine.`);

@@ -5,6 +5,7 @@
 
 	import Board from '$lib/components/Board.svelte';
 	import CoachPanel from '$lib/components/CoachPanel.svelte';
+	import EngineCredit from '$lib/components/EngineCredit.svelte';
 	import EvalBar from '$lib/components/EvalBar.svelte';
 	import MoveList from '$lib/components/MoveList.svelte';
 	import { Game } from '$lib/game/state.svelte';
@@ -61,6 +62,7 @@
 		</div>
 
 		<MoveList moves={game.moves} />
+		<EngineCredit />
 	</div>
 
 	<CoachPanel {game} />

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import EngineCredit from '$lib/components/EngineCredit.svelte';
 	import { bandFor } from '$lib/coach/levels';
 
 	let elo = $state(1200);
@@ -82,4 +83,8 @@
 	>
 		Start game
 	</button>
+
+	<footer class="border-t border-slate-800 pt-4">
+		<EngineCredit />
+	</footer>
 </main>
