@@ -37,7 +37,7 @@
 		<div class="flex items-center gap-4">
 			<span class="text-xs text-slate-400">{game.band.label} · {game.elo}</span>
 			<a
-				href="/"
+				href="/new"
 				class="rounded-md border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white"
 			>
 				New game

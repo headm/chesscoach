@@ -103,7 +103,7 @@
 				<p class="mt-2 text-xs text-emerald-400">No mistakes or blunders. Clean game.</p>
 			{/if}
 			<a
-				href="/"
+				href="/new"
 				class="mt-4 inline-block rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-white"
 			>
 				New game
