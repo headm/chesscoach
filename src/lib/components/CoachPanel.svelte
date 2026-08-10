@@ -24,6 +24,26 @@
 	 * coaching request starts.
 	 */
 	const beforeFirstMove = $derived(!game.coach && !game.coachLoading);
+
+	/*
+	 * Both cards are held back until both have something to show.
+	 *
+	 * They arrive far apart on their own. Feedback is requested the instant the
+	 * player moves, but the hint cannot even be asked for until the engine has
+	 * replied, so the panel used to churn through four states in a few seconds:
+	 * feedback spinner, feedback card, hint spinner, hint card. Waiting for the
+	 * slower of the two and showing them together costs the feedback a second or
+	 * so and reads as one update instead of four.
+	 *
+	 * `hint` is not cleared when an escalation is requested — only when the
+	 * player moves — so pressing "I need more" leaves this true and swaps just
+	 * the hint card for its own spinner, rather than pulling the feedback out
+	 * from under the player. Once the game is over no hint is coming, so
+	 * feedback alone is enough.
+	 */
+	const cardsReady = $derived(
+		!game.coachLoading && (game.status === 'game-over' || game.hint !== null)
+	);
 </script>
 
 {#snippet card(res: CoachResponse, tone: 'hint' | 'feedback')}
@@ -111,71 +131,76 @@
 		</div>
 	{/if}
 
-	<!--
-		Feedback on the last move comes first: it closes off the move just played
-		before the panel turns to the move ahead. Everything forward-looking lives
-		in the hint below. There is no empty state — until the player has moved
-		there is no last move to review, so the section is simply absent.
-	-->
-	{#if !beforeFirstMove}
-		<section class="space-y-2">
-			<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Your last move</h3>
-			{#if game.coachLoading}
-				<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-					<div class="flex items-center gap-2 text-sm text-slate-400">
-						<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
-						Reviewing {lastPlayerMove?.san ?? 'your move'}…
-					</div>
-				</div>
-			{:else if game.coach}
+	{#if game.status === 'booting'}
+		<!-- The boot notice above is already this turn's loading state. -->
+	{:else if !cardsReady}
+		<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+			<div class="flex items-center gap-2 text-sm text-slate-400">
+				<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
+				{game.coachLoading
+					? `Reviewing ${lastPlayerMove?.san ?? 'your move'}…`
+					: 'Looking at the position…'}
+			</div>
+		</div>
+	{:else}
+		<!--
+			Feedback on the last move comes first: it closes off the move just played
+			before the panel turns to the move ahead. Everything forward-looking lives
+			in the hint below. There is no empty state — until the player has moved
+			there is no last move to review, so the section is simply absent.
+		-->
+		{#if !beforeFirstMove && game.coach}
+			<section class="space-y-2">
+				<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Your last move</h3>
 				{@render card(game.coach, 'feedback')}
-			{/if}
-		</section>
-	{/if}
+			</section>
+		{/if}
 
-	<!-- Hint. Level 1 is automatic; the buttons only escalate. -->
-	{#if game.status !== 'game-over'}
-		<section class="space-y-3">
-			<div class="flex items-baseline justify-between">
-				<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">
-					{beforeFirstMove ? 'Opening move' : 'This position'}
-				</h3>
-				{#if game.hintLevel > 0}
-					<span class="text-xs text-sky-400/70">Hint {game.hintLevel}/3</span>
-				{/if}
-			</div>
+		<!-- Hint. Level 1 is automatic; the buttons only escalate. -->
+		{#if game.status !== 'game-over'}
+			<section class="space-y-3">
+				<div class="flex items-baseline justify-between">
+					<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+						{beforeFirstMove ? 'Opening move' : 'This position'}
+					</h3>
+					{#if game.hintLevel > 0}
+						<span class="text-xs text-sky-400/70">Hint {game.hintLevel}/3</span>
+					{/if}
+				</div>
 
-			{#if game.hintLoading}
-				<div class="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
-					<div class="flex items-center gap-2 text-sm text-sky-200/70">
-						<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
-						Looking at the position…
+				<!--
+					Only an escalation reaches this spinner. The automatic level-1 hint is
+					covered by the shared loading state above, which is what keeps this
+					card and the feedback card from landing separately.
+				-->
+				{#if game.hintLoading}
+					<div class="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+						<div class="flex items-center gap-2 text-sm text-sky-200/70">
+							<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
+							Looking at the position…
+						</div>
 					</div>
-				</div>
-			{:else if game.hint}
-				{@render card(game.hint, 'hint')}
-			{:else}
-				<div class="rounded-lg border border-dashed border-slate-800 p-4 text-sm text-slate-500">
-					A hint appears here as soon as it's your move.
-				</div>
-			{/if}
+				{:else if game.hint}
+					{@render card(game.hint, 'hint')}
+				{/if}
 
-			<div class="grid grid-cols-2 gap-2">
-				<button
-					onclick={() => game.requestHint(2)}
-					disabled={!canEscalate || game.hintLevel >= 2}
-					class="rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-				>
-					I need more
-				</button>
-				<button
-					onclick={() => game.requestHint(3)}
-					disabled={!canEscalate || game.hintLevel >= 3}
-					class="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-				>
-					Show me the move
-				</button>
-			</div>
-		</section>
+				<div class="grid grid-cols-2 gap-2">
+					<button
+						onclick={() => game.requestHint(2)}
+						disabled={!canEscalate || game.hintLevel >= 2}
+						class="rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						I need more
+					</button>
+					<button
+						onclick={() => game.requestHint(3)}
+						disabled={!canEscalate || game.hintLevel >= 3}
+						class="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						Show me the move
+					</button>
+				</div>
+			</section>
+		{/if}
 	{/if}
 </aside>
