@@ -84,11 +84,16 @@ function hint(req: CoachRequest, band: Band): CoachResponse {
 	};
 }
 
+/*
+ * No headline on any of these: the feedback card is titled with the move's
+ * grade, which is computed rather than written, so a headline here would be
+ * text nothing renders. The body has to stand on its own, exactly as the
+ * model-backed prompt requires of it.
+ */
 function feedback(req: CoachRequest, band: Band): CoachResponse {
 	const m = req.playedMove;
 	if (!m) {
 		return {
-			headline: 'Move played',
 			body: 'No analysis available for this move.',
 			highlightSquares: [],
 			revealedMove: null,
@@ -98,7 +103,6 @@ function feedback(req: CoachRequest, band: Band): CoachResponse {
 
 	if (m.grade === 'best') {
 		return {
-			headline: `${m.san} is the best move`,
 			body: `That is exactly what the engine plays here. The position is now ${fmt(m.cpAfter)} from your side.`,
 			highlightSquares: [],
 			revealedMove: null,
@@ -108,7 +112,6 @@ function feedback(req: CoachRequest, band: Band): CoachResponse {
 
 	if (m.grade === 'good') {
 		return {
-			headline: `${m.san} is fine`,
 			body: `It keeps the evaluation at ${fmt(m.cpAfter)}. ${
 				m.bestSan && m.bestSan !== m.san && band.id !== 'beginner'
 					? `The engine marginally prefers ${m.bestSan}, but the difference is not something to worry about at this level.`
@@ -126,7 +129,6 @@ function feedback(req: CoachRequest, band: Band): CoachResponse {
 		m.grade === 'blunder' ? 'a blunder' : m.grade === 'mistake' ? 'a mistake' : 'an inaccuracy';
 
 	return {
-		headline: `${m.san} is ${label} — ${lost} pawns`,
 		body: `The evaluation moved from ${fmt(m.cpBefore)} to ${fmt(m.cpAfter)}.${
 			m.bestSan ? ` ${m.bestSan} was the move${m.bestPvSan.length > 1 ? `, with ${m.bestPvSan.slice(0, 4).join(' ')} to follow` : ''}.` : ''
 		}${risk ? ` Your ${risk.piece} on ${risk.square} is now loose.` : ''}`,
