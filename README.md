@@ -19,6 +19,27 @@ coaching. That fallback is a real degradation, not a placeholder: it is the
 Option-A behaviour, and the difference between it and the model-backed coach is
 the argument for the model-backed coach.
 
+## Coaching cache (optional)
+
+A coaching note is a pure function of the prompt, the rating band and the
+position, so identical requests can be served from store rather than re-written.
+Set `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (the `sb_secret_…` one, not the
+publishable key) and the app keeps them in a shared table: every visitor reads
+the same cache, and it survives deploys. One player walking into the Italian
+pays for it; everyone after them reads it back.
+
+```bash
+# in your Supabase project, once
+psql "$DATABASE_URL" -f supabase/migrations/0001_coach_cache.sql
+```
+
+Without those variables there is no cache and every note is written fresh — the
+app is otherwise unchanged, and an unreachable or misconfigured store degrades
+to the same thing rather than failing a request. The cache is transparent
+either way: a hit returns exactly the bytes a fresh call would have, so it
+trades cost, never quality. See `src/lib/server/coach/cache.ts` for the key's
+shape and why each part of it is there.
+
 ## How it fits together
 
 ```

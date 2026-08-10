@@ -5,6 +5,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { bandFor } from '$lib/coach/levels';
 import { heuristicCoach } from '$lib/coach/fallback';
 import { SHARED_RULES, bandBlock, buildUserMessage } from '$lib/coach/prompt';
+import { cacheCoaching, cachedCoaching, coachCacheKey } from '$lib/server/coach/cache';
 import { COACH_SCHEMA, type CoachRequest, type CoachResponse } from '$lib/coach/types';
 
 const DEFAULT_MODEL = 'claude-opus-5';
@@ -18,12 +19,29 @@ function getClient(): Anthropic | null {
 
 export const POST: RequestHandler = async ({ request }) => {
 	const req = (await request.json()) as CoachRequest;
-	const anthropic = getClient();
+	const band = bandFor(req.playerElo);
+
+	/*
+	 * The cache is consulted first, before the API key is even looked at. A hit
+	 * returns the bytes an identical call already produced, so it is not an
+	 * optimisation inside the Claude path — it stands in front of it. It also
+	 * means a deployment with no key still serves real coaching for any position
+	 * another visitor has already paid for, which beats the heuristics outright.
+	 */
+	const cacheKey = coachCacheKey(req, band);
+	if (cacheKey) {
+		const hit = await cachedCoaching(cacheKey);
+		if (hit) {
+			if (env.NODE_ENV !== 'production') {
+				console.log(`[coach] ${req.mode} elo=${req.playerElo} band=${band.id} cache=hit`);
+			}
+			return json(hit);
+		}
+	}
 
 	// No credentials configured — the app stays playable on heuristic coaching.
+	const anthropic = getClient();
 	if (!anthropic) return json(heuristicCoach(req));
-
-	const band = bandFor(req.playerElo);
 
 	try {
 		const response = await anthropic.messages.create({
@@ -56,7 +74,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (env.NODE_ENV !== 'production') {
 			const u = response.usage;
 			console.log(
-				`[coach] ${req.mode} elo=${req.playerElo} band=${band.id} ` +
+				`[coach] ${req.mode} elo=${req.playerElo} band=${band.id} cache=miss ` +
 					`in=${u.input_tokens} cache_read=${u.cache_read_input_tokens ?? 0} ` +
 					`cache_write=${u.cache_creation_input_tokens ?? 0} out=${u.output_tokens}`
 			);
@@ -71,6 +89,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		// not to spoil the answer.
 		if (req.mode === 'hint' && (req.hintLevel ?? 1) < 3) parsed.revealedMove = null;
 		parsed.highlightSquares = (parsed.highlightSquares ?? []).slice(0, 4);
+
+		// Stored after the contract is enforced, so a hit and a miss return the
+		// same thing rather than the cache replaying an unclamped response.
+		if (cacheKey) await cacheCoaching(cacheKey, parsed);
 
 		return json(parsed);
 	} catch (err) {
