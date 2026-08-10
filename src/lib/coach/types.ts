@@ -37,7 +37,10 @@ export interface CoachRequest {
 	playerElo: number;
 	playerColor: 'w' | 'b';
 	fen: string;
-	moveNumber: number;
+	/*
+	 * No move number: it varies between transpositions to the same position and
+	 * would split the response cache for no benefit. See `buildUserMessage`.
+	 */
 	openingName: string | null;
 	candidates: CandidateLine[];
 	facts: PositionFacts;

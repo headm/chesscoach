@@ -113,13 +113,19 @@ Hold to this bar. Flagging a move that falls under it teaches the player to dist
 
 /**
  * The per-request payload. Kept compact — every token here is uncached.
+ *
+ * Deliberately no move number. Two games that transpose to the same position by
+ * different move orders would otherwise send different payloads and so miss
+ * each other in the response cache, for a field the model barely needs:
+ * `phase` already says opening/middlegame/endgame, and `facts` raises the
+ * king-still-in-the-centre point on its own once the move number warrants it.
+ * Re-adding it here would quietly halve the cache's hit rate.
  */
 export function buildUserMessage(req: CoachRequest): string {
 	const payload: Record<string, unknown> = {
 		mode: req.mode,
 		hintLevel: req.mode === 'hint' ? (req.hintLevel ?? 1) : undefined,
 		playingAs: req.playerColor === 'w' ? 'white' : 'black',
-		moveNumber: req.moveNumber,
 		opening: req.openingName ?? undefined,
 		phase: req.facts.phase,
 		materialBalance: req.facts.materialBalance,
