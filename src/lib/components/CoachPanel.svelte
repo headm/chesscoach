@@ -15,6 +15,15 @@
 	// The first hint arrives on its own at the start of every turn, so the panel
 	// only ever offers the two escalations past it.
 	const canEscalate = $derived(game.isPlayerTurn && !game.hintLoading);
+
+	/*
+	 * True until the player makes their first move. `coach` is only ever
+	 * replaced after that, never cleared, so this flips exactly once — which is
+	 * what the feedback section and the hint's heading both key off. Deriving it
+	 * from `moves` instead would flicker: the move is appended a beat after the
+	 * coaching request starts.
+	 */
+	const beforeFirstMove = $derived(!game.coach && !game.coachLoading);
 </script>
 
 {#snippet card(res: CoachResponse, tone: 'hint' | 'feedback')}
@@ -101,31 +110,32 @@
 	<!--
 		Feedback on the last move comes first: it closes off the move just played
 		before the panel turns to the move ahead. Everything forward-looking lives
-		in "This position" below.
+		in the hint below. There is no empty state — until the player has moved
+		there is no last move to review, so the section is simply absent.
 	-->
-	<section class="space-y-2">
-		<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Your last move</h3>
-		{#if game.coachLoading}
-			<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-				<div class="flex items-center gap-2 text-sm text-slate-400">
-					<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
-					Reviewing {lastPlayerMove?.san ?? 'your move'}…
+	{#if !beforeFirstMove}
+		<section class="space-y-2">
+			<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Your last move</h3>
+			{#if game.coachLoading}
+				<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+					<div class="flex items-center gap-2 text-sm text-slate-400">
+						<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
+						Reviewing {lastPlayerMove?.san ?? 'your move'}…
+					</div>
 				</div>
-			</div>
-		{:else if game.coach}
-			{@render card(game.coach, 'feedback')}
-		{:else}
-			<div class="rounded-lg border border-dashed border-slate-800 p-4 text-sm text-slate-500">
-				Play a move and I'll tell you what it did.
-			</div>
-		{/if}
-	</section>
+			{:else if game.coach}
+				{@render card(game.coach, 'feedback')}
+			{/if}
+		</section>
+	{/if}
 
 	<!-- Hint. Level 1 is automatic; the buttons only escalate. -->
 	{#if game.status !== 'game-over'}
 		<section class="space-y-3">
 			<div class="flex items-baseline justify-between">
-				<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">This position</h3>
+				<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+					{beforeFirstMove ? 'Opening move' : 'This position'}
+				</h3>
 				{#if game.hintLevel > 0}
 					<span class="text-xs text-sky-400/70">Hint {game.hintLevel}/3</span>
 				{/if}
