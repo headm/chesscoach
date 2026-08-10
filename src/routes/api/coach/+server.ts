@@ -17,7 +17,8 @@ function getClient(): Anthropic | null {
 	return client;
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, platform }) => {
+	const receivedAt = Date.now();
 	const req = (await request.json()) as CoachRequest;
 	const band = bandFor(req.playerElo);
 
@@ -90,9 +91,29 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (req.mode === 'hint' && (req.hintLevel ?? 1) < 3) parsed.revealedMove = null;
 		parsed.highlightSquares = (parsed.highlightSquares ?? []).slice(0, 4);
 
-		// Stored after the contract is enforced, so a hit and a miss return the
-		// same thing rather than the cache replaying an unclamped response.
-		if (cacheKey) await cacheCoaching(cacheKey, parsed);
+		/*
+		 * Stored after the contract is enforced, so a hit and a miss return the
+		 * same thing rather than the cache replaying an unclamped response — but
+		 * deliberately not awaited. The player is waiting on this response and the
+		 * write buys them nothing; it is for whoever reaches this position next.
+		 *
+		 * `waitUntil` is what makes not awaiting safe. A serverless instance can
+		 * be frozen the moment it responds, and a write still on the wire is
+		 * simply lost, so the position would be paid for again by every visitor
+		 * after this one. Handing the promise to the host keeps the invocation
+		 * alive for it without holding up the response. Where there is no
+		 * `waitUntil` — `vite dev`, or any long-lived Node process — nothing
+		 * freezes, so leaving it running is enough. `cacheCoaching` swallows its
+		 * own failures, so neither path can produce an unhandled rejection.
+		 */
+		if (cacheKey) {
+			const stored = cacheCoaching(cacheKey, parsed);
+			if (platform?.context?.waitUntil) platform.context.waitUntil(stored);
+		}
+
+		if (env.NODE_ENV !== 'production') {
+			console.log(`[coach] responded in ${Date.now() - receivedAt}ms`);
+		}
 
 		return json(parsed);
 	} catch (err) {

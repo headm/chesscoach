@@ -183,19 +183,22 @@ export async function cacheCoaching(key: string, res: CoachResponse): Promise<vo
 	if (!supabase) return;
 
 	/*
-	 * Awaited rather than left in flight. On a serverless host the instance can
-	 * be frozen the moment the response is returned, and a write still on the
-	 * wire is simply lost — the position would then be paid for again by every
-	 * visitor after this one. The cost is one short round trip on the tail of a
-	 * call that already took seconds.
+	 * This returns a promise the caller is expected not to await — see the
+	 * endpoint, which hands it to `waitUntil` instead. Nothing here may throw:
+	 * a rejection nobody is waiting on is an unhandled rejection, which on some
+	 * hosts takes the process with it.
 	 */
+	const startedAt = Date.now();
 	try {
 		const { error } = await supabase
 			.from(TABLE)
 			.upsert({ key, response: res }, { onConflict: 'key' })
 			.abortSignal(AbortSignal.timeout(WRITE_TIMEOUT_MS));
 		if (error) console.error('[coach] cache write failed:', error.message);
+		else if (env.NODE_ENV !== 'production') {
+			console.log(`[coach] cache write ${Date.now() - startedAt}ms`);
+		}
 	} catch (err) {
-		console.error('[coach] cache write failed:', err);
+		console.error(`[coach] cache write failed after ${Date.now() - startedAt}ms:`, err);
 	}
 }
