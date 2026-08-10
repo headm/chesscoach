@@ -6,7 +6,7 @@ import { bandFor } from '$lib/coach/levels';
 import { heuristicCoach } from '$lib/coach/fallback';
 import { SHARED_RULES, bandBlock, buildUserMessage } from '$lib/coach/prompt';
 import { cacheCoaching, cachedCoaching, coachCacheKey } from '$lib/server/coach/cache';
-import { COACH_SCHEMA, type CoachRequest, type CoachResponse } from '$lib/coach/types';
+import { coachSchema, type CoachRequest, type CoachResponse } from '$lib/coach/types';
 
 const DEFAULT_MODEL = 'claude-opus-5';
 
@@ -53,7 +53,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			// visible output, and low effort already gets most of the speed back.
 			output_config: {
 				effort: 'low',
-				format: { type: 'json_schema', schema: COACH_SCHEMA }
+				format: { type: 'json_schema', schema: coachSchema(req.mode) }
 			},
 			system: [
 				// Two cache breakpoints: the shared rules stay hot across every band,

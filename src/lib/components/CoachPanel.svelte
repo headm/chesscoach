@@ -33,22 +33,26 @@
 			: 'border-slate-700 bg-slate-900/60'}"
 	>
 		<!--
-			Feedback is titled by the move's grade rather than by the model's headline.
+			Feedback is titled by the move's grade rather than by a written headline.
 			The two said the same thing twice — a "Best move" label above a "Best move —
 			straight into the centre" headline — and the grade is the half that is
 			computed rather than written, so it is the half that can be trusted to be
-			consistent. The headline is not rendered in this mode; the body carries the
-			point. A missing grade (dropped analysis) falls back to the headline.
+			consistent. The model is not asked for a headline in this mode at all, so
+			there is nothing to fall back to when the grade is missing (dropped
+			analysis): the card runs title-less and the body carries the point, which
+			is what the prompt tells it to write for.
 		-->
-		{#if tone === 'feedback' && lastPlayerMove?.grade}
-			<p class="text-sm font-semibold {GRADE_COLOR[lastPlayerMove.grade]}">
-				{GRADE_LABEL[lastPlayerMove.grade]}
-				{#if lastPlayerMove.cpLoss && lastPlayerMove.cpLoss > 10}
-					<span class="font-normal text-slate-500">
-						· −{(lastPlayerMove.cpLoss / 100).toFixed(2)}
-					</span>
-				{/if}
-			</p>
+		{#if tone === 'feedback'}
+			{#if lastPlayerMove?.grade}
+				<p class="text-sm font-semibold {GRADE_COLOR[lastPlayerMove.grade]}">
+					{GRADE_LABEL[lastPlayerMove.grade]}
+					{#if lastPlayerMove.cpLoss && lastPlayerMove.cpLoss > 10}
+						<span class="font-normal text-slate-500">
+							· −{(lastPlayerMove.cpLoss / 100).toFixed(2)}
+						</span>
+					{/if}
+				</p>
+			{/if}
 		{:else}
 			<p class="text-sm font-semibold text-slate-100">{res.headline}</p>
 		{/if}
