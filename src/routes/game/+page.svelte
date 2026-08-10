@@ -58,8 +58,14 @@
 
 			14rem = the 11.5rem of vertical chrome above and below the board, plus the
 			2.5rem the column carries beyond the board's own width.
+
+			The `max()` floors the board at 20rem — 40px squares, a shade wider than
+			the 303px a 375px phone gets, and about the point below which the squares
+			stop being comfortable to hit. Short windows scroll past the fold instead
+			of shrinking further: a board too small to play on is worse than one you
+			have to scroll to. The floor takes over below roughly 584px of height.
 		-->
-		<div class="flex w-full flex-col gap-4 lg:w-[calc(100vh-14rem)]">
+		<div class="flex w-full flex-col gap-4 lg:w-[max(22.5rem,calc(100vh-14rem))]">
 			<div class="flex gap-3">
 				<EvalBar whiteCp={game.evalWhiteCp} orientation={playerColor} />
 				<div class="min-w-0 flex-1">
