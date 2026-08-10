@@ -30,21 +30,29 @@
 	});
 </script>
 
-<div class="rounded-lg border border-slate-800 bg-slate-900/60">
+<!--
+	`h-full` and the `flex-1` scroller let this fill whatever height it is given,
+	which is the board's when it sits alongside it. The `max-h-56` still applies
+	on the stacked layout, where it is below the board and nothing bounds it.
+-->
+<div class="flex h-full flex-col rounded-lg border border-slate-800 bg-slate-900/60">
 	<h3 class="border-b border-slate-800 px-3 py-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
-		Moves
+		History
 	</h3>
-	<div bind:this={scroller} class="max-h-56 overflow-y-auto px-3 py-2 font-mono text-xs">
+	<div
+		bind:this={scroller}
+		class="max-h-56 flex-1 overflow-y-auto px-3 py-2 font-mono text-xs lg:max-h-none"
+	>
 		{#if rows.length === 0}
 			<p class="py-2 text-slate-600">No moves yet.</p>
 		{/if}
 		{#each rows as row (row.no)}
 			<div class="flex gap-2 py-0.5">
-				<span class="w-6 shrink-0 text-slate-600">{row.no}.</span>
-				<span class="w-16 {row.white?.grade ? GRADE_COLOR[row.white.grade] : 'text-slate-300'}">
+				<span class="w-8 shrink-0 text-slate-600">{row.no}.</span>
+				<span class="w-14 {row.white?.grade ? GRADE_COLOR[row.white.grade] : 'text-slate-300'}">
 					{row.white?.san ?? ''}
 				</span>
-				<span class="w-16 {row.black?.grade ? GRADE_COLOR[row.black.grade] : 'text-slate-300'}">
+				<span class="w-14 {row.black?.grade ? GRADE_COLOR[row.black.grade] : 'text-slate-300'}">
 					{row.black?.san ?? ''}
 				</span>
 			</div>
