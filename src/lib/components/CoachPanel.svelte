@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GRADE_COLOR, GRADE_LABEL, type Band } from '$lib/coach/levels';
+	import { GRADE_COLOR, GRADE_LABEL } from '$lib/coach/levels';
 	import type { CoachResponse } from '$lib/coach/types';
 	import type { Game } from '$lib/game/state.svelte';
 
@@ -8,7 +8,6 @@
 	}
 	let { game }: Props = $props();
 
-	const band: Band = $derived(game.band);
 	const lastPlayerMove = $derived(
 		[...game.moves].reverse().find((m) => m.color === game.playerColor) ?? null
 	);
@@ -24,11 +23,37 @@
 			? 'border-sky-500/30 bg-sky-500/5'
 			: 'border-slate-700 bg-slate-900/60'}"
 	>
-		<p class="text-sm font-semibold text-slate-100">{res.headline}</p>
+		<!--
+			Feedback is titled by the move's grade rather than by the model's headline.
+			The two said the same thing twice — a "Best move" label above a "Best move —
+			straight into the centre" headline — and the grade is the half that is
+			computed rather than written, so it is the half that can be trusted to be
+			consistent. The headline is not rendered in this mode; the body carries the
+			point. A missing grade (dropped analysis) falls back to the headline.
+		-->
+		{#if tone === 'feedback' && lastPlayerMove?.grade}
+			<p class="text-sm font-semibold {GRADE_COLOR[lastPlayerMove.grade]}">
+				{GRADE_LABEL[lastPlayerMove.grade]}
+				{#if lastPlayerMove.cpLoss && lastPlayerMove.cpLoss > 10}
+					<span class="font-normal text-slate-500">
+						· −{(lastPlayerMove.cpLoss / 100).toFixed(2)}
+					</span>
+				{/if}
+			</p>
+		{:else}
+			<p class="text-sm font-semibold text-slate-100">{res.headline}</p>
+		{/if}
 		<p class="mt-1.5 text-sm leading-relaxed text-slate-300">{res.body}</p>
 		{#if res.revealedMove}
-			<p class="mt-2.5 inline-block rounded bg-slate-800 px-2 py-1 font-mono text-sm text-emerald-300">
-				{res.revealedMove}
+			<p class="mt-2.5 flex items-center gap-2">
+				<!-- In feedback the move is what should have been played, not what to
+				     play now — label it so the two cards can't be read the same way. -->
+				{#if tone === 'feedback'}
+					<span class="text-xs text-slate-500">Better was</span>
+				{/if}
+				<span class="inline-block rounded bg-slate-800 px-2 py-1 font-mono text-sm text-emerald-300">
+					{res.revealedMove}
+				</span>
 			</p>
 		{/if}
 		{#if res.fallback}
@@ -40,17 +65,6 @@
 {/snippet}
 
 <aside class="flex w-full flex-col gap-4 lg:w-96">
-	<header class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-		<div class="flex items-baseline justify-between">
-			<h2 class="text-sm font-semibold tracking-wide text-slate-200 uppercase">Coach</h2>
-			<span class="text-xs text-slate-400">{band.label} · {game.elo}</span>
-		</div>
-		<p class="mt-1 text-xs text-slate-500">
-			Tuned for {band.label.toLowerCase()} play — {band.topics.length} topics in scope,
-			errors flagged from {band.thresholds.inaccuracy}cp.
-		</p>
-	</header>
-
 	{#if game.status === 'booting'}
 		<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-400">
 			Warming up the engine…
@@ -83,6 +97,29 @@
 			</a>
 		</div>
 	{/if}
+
+	<!--
+		Feedback on the last move comes first: it closes off the move just played
+		before the panel turns to the move ahead. Everything forward-looking lives
+		in "This position" below.
+	-->
+	<section class="space-y-2">
+		<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Your last move</h3>
+		{#if game.coachLoading}
+			<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+				<div class="flex items-center gap-2 text-sm text-slate-400">
+					<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
+					Reviewing {lastPlayerMove?.san ?? 'your move'}…
+				</div>
+			</div>
+		{:else if game.coach}
+			{@render card(game.coach, 'feedback')}
+		{:else}
+			<div class="rounded-lg border border-dashed border-slate-800 p-4 text-sm text-slate-500">
+				Play a move and I'll tell you what it did.
+			</div>
+		{/if}
+	</section>
 
 	<!-- Hint. Level 1 is automatic; the buttons only escalate. -->
 	{#if game.status !== 'game-over'}
@@ -127,31 +164,4 @@
 			</div>
 		</section>
 	{/if}
-
-	<!-- Feedback on the last move -->
-	<section class="space-y-2">
-		<h3 class="text-xs font-semibold tracking-wide text-slate-400 uppercase">Your last move</h3>
-		{#if game.coachLoading}
-			<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-				<div class="flex items-center gap-2 text-sm text-slate-400">
-					<span class="h-2 w-2 animate-pulse rounded-full bg-sky-400"></span>
-					Reviewing {lastPlayerMove?.san ?? 'your move'}…
-				</div>
-			</div>
-		{:else if game.coach}
-			{#if lastPlayerMove?.grade}
-				<p class="text-xs font-medium {GRADE_COLOR[lastPlayerMove.grade]}">
-					{GRADE_LABEL[lastPlayerMove.grade]}
-					{#if lastPlayerMove.cpLoss && lastPlayerMove.cpLoss > 10}
-						<span class="text-slate-500">· −{(lastPlayerMove.cpLoss / 100).toFixed(2)}</span>
-					{/if}
-				</p>
-			{/if}
-			{@render card(game.coach, 'feedback')}
-		{:else}
-			<div class="rounded-lg border border-dashed border-slate-800 p-4 text-sm text-slate-500">
-				Play a move and I'll tell you what it did.
-			</div>
-		{/if}
-	</section>
 </aside>

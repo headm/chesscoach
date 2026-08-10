@@ -51,13 +51,6 @@
 				<dt class="text-slate-500">Candidate moves shown</dt>
 				<dd class="text-slate-300">{band.candidateMoves}</dd>
 			</dl>
-			{#if elo < 1320}
-				<p class="mt-3 border-t border-slate-800 pt-2 text-[11px] text-slate-500">
-					Below 1320 Stockfish's own rating limiter bottoms out, so the opponent is throttled
-					with Skill Level plus occasional weaker choices — closer to how a human at this
-					level actually errs.
-				</p>
-			{/if}
 		</div>
 	</section>
 
