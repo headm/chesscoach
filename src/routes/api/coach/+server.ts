@@ -10,6 +10,40 @@ import { coachSchema, type CoachRequest, type CoachResponse } from '$lib/coach/t
 
 const DEFAULT_MODEL = 'claude-opus-5';
 
+/**
+ * Which models accept `output_config.effort`.
+ *
+ * It is not universal: the Opus 4.5-and-later line, Sonnet 4.6 and 5, and the
+ * Fable/Mythos models take it, while Haiku 4.5 and Sonnet 4.5 reject the whole
+ * request with a 400. `.env.example` offers Haiku as the cheap, fast option for
+ * COACH_MODEL, so sending `effort` unconditionally made that documented setting
+ * fail — and fail silently, because the catch below demotes any error to
+ * heuristic coaching. The player just quietly got worse notes.
+ *
+ * An allowlist rather than a blocklist so an unfamiliar model degrades to no
+ * effort hint instead of failing outright.
+ */
+const EFFORT_MODELS = [
+	'claude-opus-5',
+	'claude-opus-4-8',
+	'claude-opus-4-7',
+	'claude-opus-4-6',
+	'claude-opus-4-5',
+	'claude-sonnet-5',
+	'claude-sonnet-4-6',
+	'claude-fable-5',
+	'claude-mythos-5'
+];
+
+function outputConfig(model: string, mode: CoachRequest['mode']) {
+	const format = { type: 'json_schema', schema: coachSchema(mode) } as const;
+	// `low` effort keeps latency down for what is a short, well-scoped writing
+	// task. Thinking is left at its default rather than disabled — disabling it
+	// on Opus 5 risks internal tags leaking into the visible output, and low
+	// effort already gets most of the speed back.
+	return EFFORT_MODELS.includes(model) ? { effort: 'low' as const, format } : { format };
+}
+
 let client: Anthropic | null = null;
 function getClient(): Anthropic | null {
 	if (!env.ANTHROPIC_API_KEY) return null;
@@ -44,18 +78,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const anthropic = getClient();
 	if (!anthropic) return json(heuristicCoach(req));
 
+	const model = env.COACH_MODEL || DEFAULT_MODEL;
+
 	try {
 		const response = await anthropic.messages.create({
-			model: env.COACH_MODEL || DEFAULT_MODEL,
+			model,
 			max_tokens: 1024,
-			// `low` effort keeps latency down for what is a short, well-scoped
-			// writing task. Thinking is left at its default (adaptive) rather than
-			// disabled — disabling it on Opus 5 risks internal tags leaking into the
-			// visible output, and low effort already gets most of the speed back.
-			output_config: {
-				effort: 'low',
-				format: { type: 'json_schema', schema: coachSchema(req.mode) }
-			},
+			output_config: outputConfig(model, req.mode),
 			system: [
 				// Two cache breakpoints: the shared rules stay hot across every band,
 				// the band block across every request at that band. Per-move data
