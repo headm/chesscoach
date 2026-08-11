@@ -84,14 +84,14 @@ export const BANDS: Band[] = [
 			'hanging pieces and loose pieces',
 			'two-move tactics and simple combinations',
 			'development, castling early, not moving the same piece twice',
-			'controlling the centre',
-			'king safety once the centre opens',
+			'controlling the center',
+			'king safety once the center opens',
 			'simple endgame technique (king activity, passed pawns)'
 		],
 		avoid: ['deep positional imbalances', 'prophylaxis', 'subtle move-order points'],
 		candidateMoves: 2,
 		voice:
-			'Direct and practical. Standard chess terms are fine (development, centre, outpost) but explain anything more advanced. Two ideas maximum. Point out the pattern, not just the move — the player should recognise it next game.',
+			'Direct and practical. Standard chess terms are fine (development, center, outpost) but explain anything more advanced. Two ideas maximum. Point out the pattern, not just the move — the player should recognize it next game.',
 		depthGuidance:
 			'Two to three ply. You may compare the best move against the played move, but keep lines short.'
 	},
