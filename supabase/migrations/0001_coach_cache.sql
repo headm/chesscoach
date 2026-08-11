@@ -31,17 +31,24 @@ create index if not exists coach_cache_created_at_idx on public.coach_cache (cre
 -- position.
 alter table public.coach_cache enable row level security;
 
--- Housekeeping. Neither is automatic — run when it matters, or wire either one
+-- Housekeeping. Neither is automatic — run when it matters, or wire the second
 -- into a pg_cron job.
 --
 -- After a prompt change, the old version's rows are dead weight; nothing will
--- ever ask for those keys again. Find the live prefixes in the app logs or by
--- grouping, then drop the rest:
+-- ever ask for those keys again. Sweeping them is a script rather than a query
+-- here, because there is one live prefix per band and not one per table:
+-- `promptVersion` hashes SHARED_RULES together with the band's own block, so an
+-- edit to the shared rules moves all four prefixes and an edit to one band's
+-- topics moves only that one. A delete written against a single hash would take
+-- three bands' live rows with it.
 --
---   delete from public.coach_cache
---   where key not like 'v<current-hash>:%';
+--   node scripts/sweep-coach-cache.mjs            # plan
+--   node scripts/sweep-coach-cache.mjs --write
 --
--- Or simply age everything out:
+-- Warming the new prompt on the positions the old rows covered, before the
+-- sweep, is scripts/backfill-coach-cache.mjs.
+--
+-- Ageing rows out needs no such care, and is a query:
 --
 --   delete from public.coach_cache
 --   where created_at < now() - interval '90 days';

@@ -6,6 +6,8 @@
   "scripts": {
     "postinstall": "node scripts/setup-stockfish.mjs",
     "setup:stockfish": "node scripts/setup-stockfish.mjs",
+    "backfill:coach-cache": "node scripts/backfill-coach-cache.mjs",
+    "sweep:coach-cache": "node scripts/sweep-coach-cache.mjs",
     "prepare": "svelte-kit sync || echo ''",
     "dev": "vite dev",
     "build": "vite build",
