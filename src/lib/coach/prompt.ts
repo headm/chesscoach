@@ -48,7 +48,7 @@ If the data does not support the point you want to make, make a different point.
 
 All centipawn numbers in the DATA block are already stated from the player's point of view. Positive means the player is better; negative means the opponent is better. 100 centipawns is one pawn. \`cpLoss\` is how much the played move gave away and is never negative.
 
-You are told the move's grade (best / good / inaccuracy / mistake / blunder). That grade has already been calculated against this player's rating band, so trust it — do not re-derive it from the raw numbers and do not contradict it. A move graded "good" should not be criticised even if the engine slightly prefers something else.
+You are told the move's grade (best / good / inaccuracy / mistake / blunder). That grade has already been calculated against this player's rating band, so trust it — do not re-derive it from the raw numbers and do not contradict it. A move graded "good" should not be criticized even if the engine slightly prefers something else.
 
 # The two modes
 
@@ -98,6 +98,7 @@ If cutting the forward-looking sentence leaves the note thin, do not pad it back
 - Write to the player as "you". Refer to the engine's suggestion as what "the engine prefers" or simply state the idea — do not say "Stockfish says" repeatedly.
 - \`highlightSquares\` should list only squares the player should actually look at, at most four. Empty array is fine and often correct.
 - No markdown, no bullet points, no headers. Plain sentences.
+- American spelling, without exception: center, defense, maneuver, recognize, criticize. Chess writing pulls hard towards the British forms and half these notes were coming back saying "centre". The app's own copy is American, so a note that says "centre" beside a card that says "center" reads as a typo rather than a dialect.
 
 # Calibration
 
@@ -129,7 +130,7 @@ You may compare up to ${band.candidateMoves} candidate move${band.candidateMoves
 
 ## What counts as an error for this player
 A move is graded against this band's expectations, not against perfect play:
-- under ${band.thresholds.inaccuracy} centipawns lost: acceptable, do not criticise
+- under ${band.thresholds.inaccuracy} centipawns lost: acceptable, do not criticize
 - ${band.thresholds.inaccuracy}–${band.thresholds.mistake}: inaccuracy
 - ${band.thresholds.mistake}–${band.thresholds.blunder}: mistake
 - ${band.thresholds.blunder} or more: blunder
@@ -144,7 +145,7 @@ Hold to this bar. Flagging a move that falls under it teaches the player to dist
  * different move orders would otherwise send different payloads and so miss
  * each other in the response cache, for a field the model barely needs:
  * `phase` already says opening/middlegame/endgame, and `facts` raises the
- * king-still-in-the-centre point on its own once the move number warrants it.
+ * king-still-in-the-center point on its own once the move number warrants it.
  * Re-adding it here would quietly halve the cache's hit rate.
  */
 export function buildUserMessage(req: CoachRequest): string {
@@ -216,7 +217,7 @@ function compactFacts(req: CoachRequest) {
 		}
 	}
 
-	if (!f.yourKing.castled && f.moveNumber >= 10) out.yourKingStillInCentre = true;
+	if (!f.yourKing.castled && f.moveNumber >= 10) out.yourKingStillInCenter = true;
 	if (f.yourKing.openFilesNearKing.length)
 		out.openFilesNearYourKing = f.yourKing.openFilesNearKing;
 	if (f.theirKing.openFilesNearKing.length)

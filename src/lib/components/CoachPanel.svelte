@@ -55,7 +55,7 @@
 		<!--
 			Feedback is titled by the move's grade rather than by a written headline.
 			The two said the same thing twice — a "Best move" label above a "Best move —
-			straight into the centre" headline — and the grade is the half that is
+			straight into the center" headline — and the grade is the half that is
 			computed rather than written, so it is the half that can be trusted to be
 			consistent. The model is not asked for a headline in this mode at all, so
 			there is nothing to fall back to when the grade is missing (dropped
