@@ -8,7 +8,17 @@ import { SHARED_RULES, bandBlock, buildUserMessage } from '$lib/coach/prompt';
 import { cacheCoaching, cachedCoaching, coachCacheKey } from '$lib/server/coach/cache';
 import { coachSchema, type CoachRequest, type CoachResponse } from '$lib/coach/types';
 
-const DEFAULT_MODEL = 'claude-opus-5';
+/*
+ * Sonnet 5 rather than Opus 5.
+ *
+ * A coaching note is ~100-130 output tokens and the player is watching a
+ * spinner for all of them. Measured on identical requests, with the engine
+ * idle so nothing else was competing: Opus 5 took 5.1-6.7s, Sonnet 5 took
+ * 3.3-3.7s. Roughly half the wait, on a writing task that is handed its
+ * candidates and its facts and asked for two or three sentences — the
+ * reasoning that earns Opus its keep is doing very little here.
+ */
+const DEFAULT_MODEL = 'claude-sonnet-5';
 
 /**
  * Which models accept `output_config.effort`.
@@ -55,6 +65,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const receivedAt = Date.now();
 	const req = (await request.json()) as CoachRequest;
 	const band = bandFor(req.playerElo);
+	const model = env.COACH_MODEL || DEFAULT_MODEL;
 
 	/*
 	 * The cache is consulted first, before the API key is even looked at. A hit
@@ -63,7 +74,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	 * means a deployment with no key still serves real coaching for any position
 	 * another visitor has already paid for, which beats the heuristics outright.
 	 */
-	const cacheKey = coachCacheKey(req, band);
+	const cacheKey = coachCacheKey(req, band, model);
 	if (cacheKey) {
 		const hit = await cachedCoaching(cacheKey);
 		if (hit) {
@@ -77,8 +88,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	// No credentials configured — the app stays playable on heuristic coaching.
 	const anthropic = getClient();
 	if (!anthropic) return json(heuristicCoach(req));
-
-	const model = env.COACH_MODEL || DEFAULT_MODEL;
 
 	try {
 		const response = await anthropic.messages.create({

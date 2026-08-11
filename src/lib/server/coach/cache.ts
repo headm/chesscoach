@@ -122,9 +122,14 @@ function normalisedFen(fen: string): string {
  * - The opening name is present because it is not derived from the position:
  *   two move orders reaching the same FEN can carry different names, and the
  *   name reaches the model, so it has to reach the key too.
+ * - The model is present for the plainest reason of all: it wrote the words.
+ *   Without it, changing `COACH_MODEL` leaves every already-cached position
+ *   answering in the old model's voice for as long as the row survives, and the
+ *   table quietly becomes a mixture of two models' work with no way to tell
+ *   which is which.
  */
-export function coachCacheKey(req: CoachRequest, band: Band): string | null {
-	const parts = [`v${promptVersion(band)}`, band.id, req.mode, normalisedFen(req.fen)];
+export function coachCacheKey(req: CoachRequest, band: Band, model: string): string | null {
+	const parts = [`v${promptVersion(band)}`, model, band.id, req.mode, normalisedFen(req.fen)];
 
 	if (req.mode === 'hint') {
 		parts.push(String(req.hintLevel ?? 1));
