@@ -253,3 +253,138 @@ function describeLoose(p: {
 		attackedBy: p.attackedBy
 	};
 }
+
+/*
+ * A fingerprint of the payload the model actually receives.
+ *
+ * `promptVersion` hashes the prompt so that rewording it strands the notes
+ * written under the old wording. The user turn needs the same treatment for the
+ * same reason: renaming a fact, dropping a field or reordering the JSON changes
+ * what the model reads just as surely as editing SHARED_RULES does. Until this
+ * existed those edits changed the notes and left every cached one in place
+ * under a key that still looked current — `yourKingStillInCentre` becoming
+ * `yourKingStillInCenter` is exactly that edit, and it went through silently.
+ *
+ * Rendered rather than read from source. Hashing the text of `buildUserMessage`
+ * would roll every key the first time a bundler minified it differently,
+ * emptying the table over a change no model could perceive. So the shape is
+ * measured by building it: the probes below are written to turn on every branch
+ * in `compactFacts` — both arms of `describeLoose`, every optional fact, both
+ * modes, and a played move with its optional fields present and absent — so
+ * that any edit to what the payload contains shows up here.
+ *
+ * They are not legal positions and are never sent anywhere. They exist to be
+ * rendered. Adding a fact to `compactFacts` means adding it here too, or the
+ * rows written before it will outlive it.
+ */
+const SHAPE_PROBES: CoachRequest[] = [
+	{
+		mode: 'hint',
+		hintLevel: 2,
+		playerElo: 1200,
+		playerColor: 'w',
+		fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+		openingName: 'Probe Opening',
+		candidates: [
+			{ rank: 1, moveSan: 'e4', moveUci: 'e2e4', cp: 30, mate: null, pvSan: ['e4', 'e5'] },
+			{ rank: 2, moveSan: 'Qh5', moveUci: 'd1h5', cp: 900, mate: 3, pvSan: ['Qh5', 'g6'] }
+		],
+		facts: {
+			fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+			sideToMove: 'w',
+			moveNumber: 24,
+			phase: 'middlegame',
+			inCheck: true,
+			legalMoveCount: 2,
+			materialBalance: -3,
+			yourLoosePieces: [
+				{
+					square: 'c4',
+					piece: 'bishop',
+					value: 3,
+					undefended: true,
+					losingExchange: false,
+					attackedBy: ['pawn on b5']
+				}
+			],
+			theirLoosePieces: [
+				{
+					square: 'f6',
+					piece: 'knight',
+					value: 3,
+					undefended: false,
+					losingExchange: true,
+					attackedBy: ['pawn on e5', 'bishop on g5']
+				}
+			],
+			yourPawnStructure: { doubledFiles: ['c'], isolatedPawns: ['a4'], passedPawns: ['h6'] },
+			theirPawnStructure: { doubledFiles: ['f'], isolatedPawns: ['d5'], passedPawns: ['b3'] },
+			yourKing: { square: 'e1', castled: false, shieldPawns: 1, openFilesNearKing: ['d', 'f'] },
+			theirKing: { square: 'g8', castled: true, shieldPawns: 2, openFilesNearKing: ['h'] },
+			development: { undevelopedMinors: 2, castled: false, queenOutEarly: true },
+			openFiles: ['d', 'e'],
+			yourKnightsOnRim: ['a4', 'h4']
+		}
+	},
+	{
+		mode: 'feedback',
+		playerElo: 1200,
+		playerColor: 'b',
+		fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+		openingName: null,
+		candidates: [
+			{ rank: 1, moveSan: 'Nf6', moveUci: 'g8f6', cp: -20, mate: null, pvSan: ['Nf6', 'd4'] }
+		],
+		facts: {
+			fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+			sideToMove: 'b',
+			moveNumber: 1,
+			phase: 'opening',
+			inCheck: false,
+			legalMoveCount: 20,
+			materialBalance: 0,
+			yourLoosePieces: [],
+			theirLoosePieces: [],
+			yourPawnStructure: { doubledFiles: [], isolatedPawns: [], passedPawns: [] },
+			theirPawnStructure: { doubledFiles: [], isolatedPawns: [], passedPawns: [] },
+			yourKing: { square: 'e8', castled: false, shieldPawns: 3, openFilesNearKing: [] },
+			theirKing: { square: 'e1', castled: false, shieldPawns: 3, openFilesNearKing: [] },
+			development: null,
+			openFiles: [],
+			yourKnightsOnRim: []
+		},
+		playedMove: {
+			san: 'Nh6',
+			uci: 'g8h6',
+			cpBefore: -20,
+			cpAfter: -60,
+			cpLoss: 40,
+			grade: 'inaccuracy',
+			bestSan: 'Nf6',
+			bestPvSan: ['Nf6', 'd4'],
+			captured: 'p',
+			givesCheck: true
+		}
+	}
+];
+
+/*
+ * The second probe again, with every optional field of `playedMove` empty.
+ * `captured` and `givesCheck` are written out only when they are set, so a
+ * change to that rule is invisible unless something renders the other side of
+ * it.
+ */
+SHAPE_PROBES.push({
+	...SHAPE_PROBES[1],
+	playedMove: {
+		...SHAPE_PROBES[1].playedMove!,
+		grade: 'best',
+		bestSan: null,
+		bestPvSan: [],
+		captured: null,
+		givesCheck: false
+	}
+});
+
+/** Every probe, rendered. Hashed into the cache key; never sent to the model. */
+export const PAYLOAD_SHAPE: string = SHAPE_PROBES.map(buildUserMessage).join('\n---\n');
