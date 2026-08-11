@@ -31,6 +31,21 @@ export interface Thresholds {
 export interface Band {
 	id: BandId;
 	label: string;
+	/**
+	 * What the coach does at this level, written for the player choosing it.
+	 *
+	 * Distinct from `voice`, which is an instruction to the model and reads like
+	 * one. The setup screen showed `voice` for a while, so a player picking a
+	 * rating was handed "Assume full standard vocabulary. Compare candidate moves
+	 * rather than announcing a single answer" — true, and addressed to somebody
+	 * else.
+	 *
+	 * Deliberately says nothing about register. How the coaching sounds is
+	 * `voice`'s business; what is being chosen on that screen is a level, not a
+	 * personality, and "warm and encouraging" tells the reader nothing about
+	 * which one to pick.
+	 */
+	description: string;
 	/** Inclusive lower bound. The last band absorbs everything above it. */
 	min: number;
 	max: number;
@@ -51,6 +66,8 @@ export const BANDS: Band[] = [
 	{
 		id: 'beginner',
 		label: 'Beginner',
+		description:
+			'The coach sticks to one-move tactics and explains any chess terms it uses.',
 		min: 0,
 		max: 1099,
 		thresholds: { inaccuracy: 90, mistake: 200, blunder: 350 },
@@ -77,6 +94,8 @@ export const BANDS: Band[] = [
 	{
 		id: 'developing',
 		label: 'Developing',
+		description:
+			'The coach looks further ahead than the move in front of you and focuses on fundamental chess concepts like development, king safety, fighting for the center.',
 		min: 1100,
 		max: 1449,
 		thresholds: { inaccuracy: 70, mistake: 150, blunder: 280 },
@@ -98,6 +117,8 @@ export const BANDS: Band[] = [
 	{
 		id: 'intermediate',
 		label: 'Intermediate',
+		description:
+			'The coach weighs alternatives rather than driving at one answer, focuses on plans rather than individual moves, and uses standard chess vocabulary.',
 		min: 1450,
 		max: 1799,
 		thresholds: { inaccuracy: 50, mistake: 110, blunder: 220 },
@@ -120,6 +141,8 @@ export const BANDS: Band[] = [
 	{
 		id: 'advanced',
 		label: 'Advanced',
+		description:
+			'The coach discusses potential lines and quotes the engine evaluation so you can judge claims yourself.',
 		min: 1800,
 		max: 9999,
 		thresholds: { inaccuracy: 35, mistake: 80, blunder: 170 },
