@@ -49,6 +49,15 @@ const BOOK: Record<string, string> = {
 	'c4 e5': 'English Opening, Reversed Sicilian'
 };
 
+/**
+ * Every name the book can produce.
+ *
+ * Exported for tooling that has a stored opening name and needs to know whether
+ * the app could have written it — a name outside this set belongs to a row no
+ * game will ever ask for again.
+ */
+export const OPENING_NAMES: ReadonlySet<string> = new Set(Object.values(BOOK));
+
 /** Longest-prefix match over the SAN move list. */
 export function openingName(sanHistory: string[]): string | null {
 	for (let len = Math.min(sanHistory.length, 8); len >= 1; len--) {
