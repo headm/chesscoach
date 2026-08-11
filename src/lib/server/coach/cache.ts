@@ -22,14 +22,13 @@
  * down with it.
  */
 
-import { createHash } from 'node:crypto';
-
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
 
 import type { Band } from '$lib/coach/levels';
-import { SHARED_RULES, bandBlock } from '$lib/coach/prompt';
 import type { CoachRequest, CoachResponse } from '$lib/coach/types';
+
+import { promptVersion } from './version';
 
 const TABLE = 'coach_cache';
 
@@ -71,30 +70,6 @@ function getClient(): SupabaseClient | null {
 	const key = env.SUPABASE_SECRET_KEY;
 	client = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
 	return client;
-}
-
-/**
- * A short hash of every instruction the response was written under.
- *
- * The prompt is edited often, and a cached note that outlives the rules that
- * produced it is worse than no cache at all — it is a silent regression with no
- * failing request to point at. Hashing both blocks means editing SHARED_RULES
- * or any part of a band (its topics, its voice, its thresholds) rolls that
- * band's keys over on the next deploy. The old rows sit there unread until
- * swept; see the migration for the two queries that do it.
- */
-const versions = new Map<string, string>();
-function promptVersion(band: Band): string {
-	const known = versions.get(band.id);
-	if (known) return known;
-	const version = createHash('sha256')
-		.update(SHARED_RULES)
-		.update(' ')
-		.update(bandBlock(band))
-		.digest('hex')
-		.slice(0, 12);
-	versions.set(band.id, version);
-	return version;
 }
 
 /**

@@ -7,10 +7,10 @@
  * hit again. This deletes them.
  *
  * There is one live prefix per band, not one per table — `promptVersion` hashes
- * SHARED_RULES together with that band's own block, so editing the shared rules
- * moves all four and editing one band's topics moves only that one. A sweep
- * written against a single hash would delete three bands' live rows, which is
- * why this is a script and not a one-line delete.
+ * SHARED_RULES together with that band's own block and the payload shape, so
+ * editing the shared rules moves all four and editing one band's topics moves
+ * only that one. A sweep written against a single hash would delete three
+ * bands' live rows, which is why this is a script and not a one-line delete.
  *
  *   node scripts/sweep-coach-cache.mjs            # plan only
  *   node scripts/sweep-coach-cache.mjs --write
@@ -21,7 +21,6 @@
  * lines in the dev log name the key — before passing --write.
  */
 
-import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -64,26 +63,14 @@ const vite = await createServer({
 	server: { middlewareMode: true },
 	resolve: { alias: { $lib: path.join(ROOT, 'src/lib') } }
 });
-const { SHARED_RULES, bandBlock } = await vite.ssrLoadModule('/src/lib/coach/prompt.ts');
+const { promptVersion } = await vite.ssrLoadModule('/src/lib/server/coach/version.ts');
 const { BANDS } = await vite.ssrLoadModule('/src/lib/coach/levels.ts');
 await vite.close();
 
-/*
- * Mirrors `promptVersion` in src/lib/server/coach/cache.ts, which cannot be
- * imported here — it sits in a module that reads $env at load. If the two ever
- * disagree this script would compute a live prefix that matches nothing and
- * propose deleting the entire table, which the guard below refuses to do.
- */
-const version = (band) =>
-	'v' +
-	createHash('sha256')
-		.update(SHARED_RULES)
-		.update(' ')
-		.update(bandBlock(band))
-		.digest('hex')
-		.slice(0, 12);
-
-const live = new Map(BANDS.map((b) => [version(b), b.id]));
+// The app's own function, not a copy of it. A sweep that computed the live
+// prefixes its own way would be one edit away from deleting the rows it is
+// meant to protect.
+const live = new Map(BANDS.map((b) => [`v${promptVersion(b)}`, b.id]));
 
 console.log('Live prefixes:');
 for (const [prefix, band] of live) console.log(`  ${prefix}  ${band}`);
