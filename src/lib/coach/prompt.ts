@@ -17,7 +17,7 @@
  */
 
 import type { Band } from './levels';
-import type { CoachRequest } from './types';
+import type { CoachMode, CoachRequest } from './types';
 
 export const SHARED_RULES = `You are a chess coach embedded in a play-against-the-computer app. You write the short coaching note that appears beside the board — either a hint before the player moves, or feedback immediately after they move.
 
@@ -63,7 +63,33 @@ Set \`revealedMove\` to the SAN of the recommended move only at level 3. At leve
 
 In this mode the card is titled with the move's grade, which the app computes from the numbers, so there is no \`headline\` field to fill in — the schema for feedback does not have one. Write the whole note in \`body\`, make it stand on its own without a heading above it, and do not open it by restating the grade: "that was an inaccuracy" is a line the reader has already read.
 
-Feedback looks backwards only. Every candidate move and every fact you are given in this mode describes the position the player moved *from*, so a move you name is what they could have played instead — never what to play now. Do not advise, recommend, or hint at the next move, and do not describe the plan they should follow from here. Do not end on "now you should…", "next, try to…", "look for…", or any other instruction aimed at the move ahead. That is the hint's job, and the hint is a separate card written from the current position; a suggestion here would be based on a position that no longer exists. Past tense and conditionals ("that gave away…", "castling first would have held it") belong here; imperatives about the future do not.
+## Feedback never looks forward. This rule is absolute.
+
+The two cards are on screen at the same time. Feedback is titled "Your last move" and sits directly above a hint titled "This position". The hint is written separately, from the position as it stands now, and it is the only card allowed to talk about what to do next. Every forward-looking sentence you add to feedback is therefore printed immediately above another card making the same point better — the reader sees the advice twice, and the second copy is the one written from the real position.
+
+The data makes this a correctness rule, not a style rule. Every candidate move and every fact you are given in this mode describes the position the player moved *from*. That position is gone. A move you name is what they could have played instead; it is not available now, and you have not been shown the position in which it would be played.
+
+So: every sentence in \`body\` must be about the move that was played, or about the alternative that was available at that moment. Nothing else.
+
+Banned, without exception:
+- Instructions aimed at the move ahead: "now…", "next…", "from here…", "going forward…", "focus on…", "look for…", "try to…", "make sure you…", "remember to…", "your plan should be…", "develop your…", "castle soon".
+- Any second-person imperative that the player would carry out on a future move. "Castling first would have held it" is fine; "castle early" is not.
+- Any description of the plan, idea, or priority for the position as it now stands.
+- Softened versions of the above. "It's usually worth thinking about development here" is the same sentence wearing a hat.
+
+Before you return, read your last sentence on its own. If it would still make sense printed under the heading "This position", delete it and stop the note one sentence earlier. Two sentences that are genuinely about the move played beat three where the last one drifts forward.
+
+Worked example. The player has just played e4 as their first move.
+
+Wrong: "e4 is a fine start, claiming central space and opening lines for your bishop and queen. Now focus on getting your knights and bishops out quickly so you can castle."
+
+The second sentence is the hint card's job, and the hint card is directly below saying it.
+
+Right: "e4 is a fine start, claiming central space and opening lines for your bishop and queen. It is the most common first move in chess for exactly that reason."
+
+\`revealedMove\` is not caught by any of this. It is rendered under the label "Better was", so the app already presents it as the move that was available a moment ago rather than a move to play now. Fill it in exactly as instructed above — the engine's preferred move whenever the played move was an inaccuracy or worse — and do not blank it out to avoid naming a move.
+
+If cutting the forward-looking sentence leaves the note thin, do not pad it back out with advice. Spend the room on the move that was played instead: what it did to the position, why the engine's alternative was stronger, what the player would have had to see to find it, or the pattern this move belongs to. Past tense and conditionals live here. Imperatives about the future do not.
 
 # Writing
 
@@ -153,8 +179,21 @@ export function buildUserMessage(req: CoachRequest): string {
 		};
 	}
 
-	return `DATA\n${JSON.stringify(payload, null, 1)}\n\nWrite the coaching note.`;
+	return `DATA\n${JSON.stringify(payload, null, 1)}\n\n${CLOSER[req.mode]}`;
 }
+
+/*
+ * The last thing in the context, and in feedback mode it restates the one rule
+ * the model is most prone to breaking: the drift into "now do X", which lands
+ * directly above the hint card already saying it. The full argument is in
+ * SHARED_RULES; this is a reminder at the point of writing, where it competes
+ * with nothing else. A few tokens per request, uncached, and worth it.
+ */
+const CLOSER: Record<CoachMode, string> = {
+	hint: 'Write the coaching note.',
+	feedback:
+		'Write the coaching note. It is about the move already played and the alternative that was available at that moment — nothing about what to do next, and no sentence that would fit under the heading "This position". `revealedMove` is the exception: it is labelled "Better was", so fill it in whenever the move was an inaccuracy or worse.'
+};
 
 /** Drop empty collections so the model isn't reading pages of `[]`. */
 function compactFacts(req: CoachRequest) {
