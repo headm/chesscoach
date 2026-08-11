@@ -16,10 +16,7 @@
 
 <main class="mx-auto flex min-h-full max-w-lg flex-col justify-center gap-8 p-6">
 	<header>
-		<h1 class="text-3xl font-semibold tracking-tight">Chess Coach</h1>
-		<p class="mt-2 text-sm text-slate-400">
-			Play the computer at your level, with coaching written for that level.
-		</p>
+		<h1 class="text-3xl font-semibold tracking-tight">New Game</h1>
 	</header>
 
 	<section class="space-y-3">
@@ -40,12 +37,19 @@
 			<span>600</span><span>1400</span><span>2200</span>
 		</div>
 
+		<!--
+			`band.description` and not `band.voice`: the latter is the register
+			instruction handed to the model, so the box used to tell the player
+			"Assume full standard vocabulary" — addressed to somebody else entirely.
+
+			The rows below stay label-and-value. Spelling the numbers out in prose —
+			"anything costing 0.7 of a pawn or more" — reads oddly here: a definition
+			list wants a figure to put beside the term, not a clause.
+		-->
 		<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
 			<p class="text-sm font-medium text-slate-200">{band.label}</p>
-			<p class="mt-1 text-xs leading-relaxed text-slate-400">{band.voice}</p>
+			<p class="mt-1 text-xs leading-relaxed text-slate-400">{band.description}</p>
 			<dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-				<dt class="text-slate-500">Coaching covers</dt>
-				<dd class="text-slate-300">{band.topics.length} topics</dd>
 				<dt class="text-slate-500">Flags errors from</dt>
 				<dd class="text-slate-300">{band.thresholds.inaccuracy} centipawns</dd>
 				<dt class="text-slate-500">Candidate moves shown</dt>
