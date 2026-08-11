@@ -122,9 +122,14 @@ function normalisedFen(fen: string): string {
  * - The opening name is present because it is not derived from the position:
  *   two move orders reaching the same FEN can carry different names, and the
  *   name reaches the model, so it has to reach the key too.
+ * - The model is present for the plainest reason of all: it wrote the words.
+ *   Without it, changing `COACH_MODEL` leaves every already-cached position
+ *   answering in the old model's voice for as long as the row survives, and the
+ *   table quietly becomes a mixture of two models' work with no way to tell
+ *   which is which.
  */
-export function coachCacheKey(req: CoachRequest, band: Band): string | null {
-	const parts = [`v${promptVersion(band)}`, band.id, req.mode, normalisedFen(req.fen)];
+export function coachCacheKey(req: CoachRequest, band: Band, model: string): string | null {
+	const parts = [`v${promptVersion(band)}`, model, band.id, req.mode, normalisedFen(req.fen)];
 
 	if (req.mode === 'hint') {
 		parts.push(String(req.hintLevel ?? 1));
@@ -183,19 +188,22 @@ export async function cacheCoaching(key: string, res: CoachResponse): Promise<vo
 	if (!supabase) return;
 
 	/*
-	 * Awaited rather than left in flight. On a serverless host the instance can
-	 * be frozen the moment the response is returned, and a write still on the
-	 * wire is simply lost — the position would then be paid for again by every
-	 * visitor after this one. The cost is one short round trip on the tail of a
-	 * call that already took seconds.
+	 * This returns a promise the caller is expected not to await — see the
+	 * endpoint, which hands it to `waitUntil` instead. Nothing here may throw:
+	 * a rejection nobody is waiting on is an unhandled rejection, which on some
+	 * hosts takes the process with it.
 	 */
+	const startedAt = Date.now();
 	try {
 		const { error } = await supabase
 			.from(TABLE)
 			.upsert({ key, response: res }, { onConflict: 'key' })
 			.abortSignal(AbortSignal.timeout(WRITE_TIMEOUT_MS));
 		if (error) console.error('[coach] cache write failed:', error.message);
+		else if (env.NODE_ENV !== 'production') {
+			console.log(`[coach] cache write ${Date.now() - startedAt}ms`);
+		}
 	} catch (err) {
-		console.error('[coach] cache write failed:', err);
+		console.error(`[coach] cache write failed after ${Date.now() - startedAt}ms:`, err);
 	}
 }
