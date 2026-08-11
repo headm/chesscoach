@@ -48,7 +48,7 @@ If the data does not support the point you want to make, make a different point.
 
 All centipawn numbers in the DATA block are already stated from the player's point of view. Positive means the player is better; negative means the opponent is better. 100 centipawns is one pawn. \`cpLoss\` is how much the played move gave away and is never negative.
 
-You are told the move's grade (best / good / inaccuracy / mistake / blunder). That grade has already been calculated against this player's rating band, so trust it — do not re-derive it from the raw numbers and do not contradict it. A move graded "good" should not be criticised even if the engine slightly prefers something else.
+You are told the move's grade (best / good / inaccuracy / mistake / blunder). That grade has already been calculated against this player's rating band, so trust it — do not re-derive it from the raw numbers and do not contradict it. A move graded "good" should not be criticized even if the engine slightly prefers something else.
 
 # The two modes
 
@@ -98,6 +98,7 @@ If cutting the forward-looking sentence leaves the note thin, do not pad it back
 - Write to the player as "you". Refer to the engine's suggestion as what "the engine prefers" or simply state the idea — do not say "Stockfish says" repeatedly.
 - \`highlightSquares\` should list only squares the player should actually look at, at most four. Empty array is fine and often correct.
 - No markdown, no bullet points, no headers. Plain sentences.
+- American spelling, without exception: center, defense, maneuver, recognize, criticize. Chess writing pulls hard towards the British forms and half these notes were coming back saying "centre". The app's own copy is American, so a note that says "centre" beside a card that says "center" reads as a typo rather than a dialect.
 
 # Calibration
 
@@ -129,7 +130,7 @@ You may compare up to ${band.candidateMoves} candidate move${band.candidateMoves
 
 ## What counts as an error for this player
 A move is graded against this band's expectations, not against perfect play:
-- under ${band.thresholds.inaccuracy} centipawns lost: acceptable, do not criticise
+- under ${band.thresholds.inaccuracy} centipawns lost: acceptable, do not criticize
 - ${band.thresholds.inaccuracy}–${band.thresholds.mistake}: inaccuracy
 - ${band.thresholds.mistake}–${band.thresholds.blunder}: mistake
 - ${band.thresholds.blunder} or more: blunder
@@ -144,7 +145,7 @@ Hold to this bar. Flagging a move that falls under it teaches the player to dist
  * different move orders would otherwise send different payloads and so miss
  * each other in the response cache, for a field the model barely needs:
  * `phase` already says opening/middlegame/endgame, and `facts` raises the
- * king-still-in-the-centre point on its own once the move number warrants it.
+ * king-still-in-the-center point on its own once the move number warrants it.
  * Re-adding it here would quietly halve the cache's hit rate.
  */
 export function buildUserMessage(req: CoachRequest): string {
@@ -216,7 +217,7 @@ function compactFacts(req: CoachRequest) {
 		}
 	}
 
-	if (!f.yourKing.castled && f.moveNumber >= 10) out.yourKingStillInCentre = true;
+	if (!f.yourKing.castled && f.moveNumber >= 10) out.yourKingStillInCenter = true;
 	if (f.yourKing.openFilesNearKing.length)
 		out.openFilesNearYourKing = f.yourKing.openFilesNearKing;
 	if (f.theirKing.openFilesNearKing.length)
@@ -252,3 +253,138 @@ function describeLoose(p: {
 		attackedBy: p.attackedBy
 	};
 }
+
+/*
+ * A fingerprint of the payload the model actually receives.
+ *
+ * `promptVersion` hashes the prompt so that rewording it strands the notes
+ * written under the old wording. The user turn needs the same treatment for the
+ * same reason: renaming a fact, dropping a field or reordering the JSON changes
+ * what the model reads just as surely as editing SHARED_RULES does. Until this
+ * existed those edits changed the notes and left every cached one in place
+ * under a key that still looked current — `yourKingStillInCentre` becoming
+ * `yourKingStillInCenter` is exactly that edit, and it went through silently.
+ *
+ * Rendered rather than read from source. Hashing the text of `buildUserMessage`
+ * would roll every key the first time a bundler minified it differently,
+ * emptying the table over a change no model could perceive. So the shape is
+ * measured by building it: the probes below are written to turn on every branch
+ * in `compactFacts` — both arms of `describeLoose`, every optional fact, both
+ * modes, and a played move with its optional fields present and absent — so
+ * that any edit to what the payload contains shows up here.
+ *
+ * They are not legal positions and are never sent anywhere. They exist to be
+ * rendered. Adding a fact to `compactFacts` means adding it here too, or the
+ * rows written before it will outlive it.
+ */
+const SHAPE_PROBES: CoachRequest[] = [
+	{
+		mode: 'hint',
+		hintLevel: 2,
+		playerElo: 1200,
+		playerColor: 'w',
+		fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+		openingName: 'Probe Opening',
+		candidates: [
+			{ rank: 1, moveSan: 'e4', moveUci: 'e2e4', cp: 30, mate: null, pvSan: ['e4', 'e5'] },
+			{ rank: 2, moveSan: 'Qh5', moveUci: 'd1h5', cp: 900, mate: 3, pvSan: ['Qh5', 'g6'] }
+		],
+		facts: {
+			fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+			sideToMove: 'w',
+			moveNumber: 24,
+			phase: 'middlegame',
+			inCheck: true,
+			legalMoveCount: 2,
+			materialBalance: -3,
+			yourLoosePieces: [
+				{
+					square: 'c4',
+					piece: 'bishop',
+					value: 3,
+					undefended: true,
+					losingExchange: false,
+					attackedBy: ['pawn on b5']
+				}
+			],
+			theirLoosePieces: [
+				{
+					square: 'f6',
+					piece: 'knight',
+					value: 3,
+					undefended: false,
+					losingExchange: true,
+					attackedBy: ['pawn on e5', 'bishop on g5']
+				}
+			],
+			yourPawnStructure: { doubledFiles: ['c'], isolatedPawns: ['a4'], passedPawns: ['h6'] },
+			theirPawnStructure: { doubledFiles: ['f'], isolatedPawns: ['d5'], passedPawns: ['b3'] },
+			yourKing: { square: 'e1', castled: false, shieldPawns: 1, openFilesNearKing: ['d', 'f'] },
+			theirKing: { square: 'g8', castled: true, shieldPawns: 2, openFilesNearKing: ['h'] },
+			development: { undevelopedMinors: 2, castled: false, queenOutEarly: true },
+			openFiles: ['d', 'e'],
+			yourKnightsOnRim: ['a4', 'h4']
+		}
+	},
+	{
+		mode: 'feedback',
+		playerElo: 1200,
+		playerColor: 'b',
+		fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+		openingName: null,
+		candidates: [
+			{ rank: 1, moveSan: 'Nf6', moveUci: 'g8f6', cp: -20, mate: null, pvSan: ['Nf6', 'd4'] }
+		],
+		facts: {
+			fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+			sideToMove: 'b',
+			moveNumber: 1,
+			phase: 'opening',
+			inCheck: false,
+			legalMoveCount: 20,
+			materialBalance: 0,
+			yourLoosePieces: [],
+			theirLoosePieces: [],
+			yourPawnStructure: { doubledFiles: [], isolatedPawns: [], passedPawns: [] },
+			theirPawnStructure: { doubledFiles: [], isolatedPawns: [], passedPawns: [] },
+			yourKing: { square: 'e8', castled: false, shieldPawns: 3, openFilesNearKing: [] },
+			theirKing: { square: 'e1', castled: false, shieldPawns: 3, openFilesNearKing: [] },
+			development: null,
+			openFiles: [],
+			yourKnightsOnRim: []
+		},
+		playedMove: {
+			san: 'Nh6',
+			uci: 'g8h6',
+			cpBefore: -20,
+			cpAfter: -60,
+			cpLoss: 40,
+			grade: 'inaccuracy',
+			bestSan: 'Nf6',
+			bestPvSan: ['Nf6', 'd4'],
+			captured: 'p',
+			givesCheck: true
+		}
+	}
+];
+
+/*
+ * The second probe again, with every optional field of `playedMove` empty.
+ * `captured` and `givesCheck` are written out only when they are set, so a
+ * change to that rule is invisible unless something renders the other side of
+ * it.
+ */
+SHAPE_PROBES.push({
+	...SHAPE_PROBES[1],
+	playedMove: {
+		...SHAPE_PROBES[1].playedMove!,
+		grade: 'best',
+		bestSan: null,
+		bestPvSan: [],
+		captured: null,
+		givesCheck: false
+	}
+});
+
+/** Every probe, rendered. Hashed into the cache key; never sent to the model. */
+export const PAYLOAD_SHAPE: string = SHAPE_PROBES.map(buildUserMessage).join('\n---\n');
