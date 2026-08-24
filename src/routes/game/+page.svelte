@@ -40,7 +40,7 @@
 	<!-- App title, spanning both columns. The coaching panel below is untitled;
 	     this is the heading for the whole screen. -->
 	<header class="flex items-center justify-between border-b border-slate-800 pb-3">
-		<h1 class="text-lg font-semibold tracking-tight text-slate-100">Chess Coach</h1>
+		<h1 class="text-lg font-semibold tracking-tight text-slate-100">Chessmate</h1>
 		<div class="flex items-center gap-4">
 			<span class="text-xs text-slate-400">{game.band.label} · {game.elo}</span>
 			<a

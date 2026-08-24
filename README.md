@@ -1,4 +1,4 @@
-# Chess Coach
+# Chessmate
 
 Play the computer at your rating, with a coaching panel written for that rating.
 The opponent's strength and the coaching's content both follow from a single ELO
