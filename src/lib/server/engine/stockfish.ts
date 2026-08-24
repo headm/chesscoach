@@ -227,7 +227,7 @@ class Engine {
  * is re-evaluated whenever anything it imports changes, and a fresh Engine per
  * reload would leak a ~170MB WASM heap each time.
  */
-const CACHE_KEY = Symbol.for('chesscoach.stockfish');
+const CACHE_KEY = Symbol.for('chessmate.stockfish');
 type Cache = { engine?: Engine };
 const cache = ((globalThis as Record<symbol, unknown>)[CACHE_KEY] ??= {}) as Cache;
 
